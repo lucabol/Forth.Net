@@ -78,12 +78,20 @@ public class Vm
         push(_inputLenInChars);
     }
     [RE] public void count() {
-        var a = popi();
+        dup();
         cat();
-        var c = pop();
+        var c = popi();
+        var a = popi();
 
         push(a + CHAR_SIZE);
-        push((cellIndex)c);
+        push(c);
+    }
+    public string dotNetString()
+    {
+        var c = popi();
+        var a = popi();
+        var s = ToChars(a, c);
+        return s.ToString();
     }
     private Span<Char> ToChars(cellIndex sourceIndex, cellIndex lengthInChars) {
             var inputByteSpan = ds.AsSpan(sourceIndex, lengthInChars * CHAR_SIZE);
@@ -104,28 +112,29 @@ public class Vm
         }
     }
     [RE] public void word() {
-        var delim = pop();
-        var s = ToChars(_source + _in, _inputLenInChars);
+        var delim = (char)pop();
+        var s = ToChars(_source, _inputLenInChars);
         var w = ToChars(_word, WORD_MAX);
 
-        var i = 0;
-        var j = 2; // It is a counted string, the first 2 bytes conains the length
+        var j = 1; // It is a counted string, the first 2 bytes conains the length
 
-        // Remove initial delim chars
-        while(j < WORD_MAX) {
-            var c = s[i++];
-            if(c == (char) delim) break;
+        while(_in < _inputLenInChars && s[_in] == delim) { _in++; }
+
+        // If all spaces to the end of the input, return a string with length 0. 
+        if(_in >= _inputLenInChars) {
+            w[0] = (char) 0;
+            push(_word);
+            return;
         }
 
-        while(j < WORD_MAX) {
-            var c = s[i++];
-            if(c == (char) delim) break; // found delim after word
+        // Here i is the index to the first non-delim char, j indexes into the word buffer.
+        while(j < WORD_MAX && _in < _inputLenInChars && s[_in] != delim ) {
+            var c = s[_in++];
             w[j++] = c;
         }
         if(j >= WORD_MAX) throw new Exception($"Word longer than {WORD_MAX}: {s}");
 
         w[0] = (char) (j - 1);  // len goes into the first char
-        _in += i - 1;           // and _in is incremented
         push(_word);
     }
     [RE] public void bl() {

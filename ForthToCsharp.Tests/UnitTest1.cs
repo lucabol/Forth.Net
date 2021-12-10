@@ -5,6 +5,7 @@ using System.IO;
 using static System.Console;
 using cell      = System.Int64;
 using cellIndex = System.Int32;
+using System.Collections.Generic;
 
 namespace ForthToCsharp.Tests;
 
@@ -55,7 +56,7 @@ public class VmTest
         // Aligned works
     }
     [Fact]
-    public void refillAndSource()
+    public void RefillAndSource()
     {
         // TODO: a lot more to test here (empty string, various boundary values, ...)
         using TextReader tr = new StringReader("  bob cat dog   \n rob job\n");
@@ -72,15 +73,22 @@ public class VmTest
     [Fact]
     public void Word()
     {
-        using TextReader tr = new StringReader("  bob cat dog   \n rob job\n");
+        using TextReader tr = new StringReader("  bob cat dog   \n rob job\nbib bop\n\n");
+        var words = new string[] { "bob", "cat", "dog", "rob", "job", "bib", "bop"};
+
         var vm = new Vm(tr, Out);
+        var lastLength = 0;
+        int i = 0;
         do {
             vm.refill();
-            vm.bl();
-            vm.word();
-            vm.count();
-            vm.dots();
-            vm.type();
+            do {
+                vm.bl();
+                vm.word();
+                vm.count();
+                vm.dup();
+                lastLength = vm.popi();
+                if(lastLength != 0) Assert.Equal(words[i++], vm.dotNetString());
+            } while(lastLength != 0);
         } while(vm.pop() != vm.ffalse());
     }
 }
