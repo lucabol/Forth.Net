@@ -1,2 +1,4 @@
 ﻿// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
+var x = 0;
+var y = "bob";
+Console.WriteLine($"Hello, World! {x} {y}");
