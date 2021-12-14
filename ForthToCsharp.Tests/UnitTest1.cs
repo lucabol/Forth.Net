@@ -91,4 +91,14 @@ public class VmTest
             } while(lastLength != 0);
         } while(vm.pop() != vm.ffalse());
     }
+
+    [Fact]
+    public void Translate()
+    {
+        using TextReader tr = new StringReader("BL WORD COUNT DROP DROP");
+        using TextWriter tw = new StringWriter();
+        var translator = new Translator(tr, tw);
+        translator.Translate();
+        Assert.Equal("vm.bl();\nvm.word();\nvm.count();\nvm.drop();\nvm.drop();\n", tw.ToString());
+    }
 }
