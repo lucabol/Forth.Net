@@ -72,7 +72,6 @@ public class Translator
     }
     public void Translate() {
         Vm vm = new(_in, _out);
-        StringBuilder sb = new();
 
         while(true) {
             // Fill the input buffer.
@@ -88,29 +87,28 @@ public class Translator
                 // TODO: is the order of checks below correct? I don't remember seeing it on ANS FORTH.
                 // If it is a word spelled differently than Forth (i.e., +) or a newly defined one, insert it.
                 if(synonyms.TryGetValue(w, out string? p)) {
-                    sb.AppendLine($"vm.{p.ToLowerInvariant()}();");
+                    _out.WriteLine($"vm.{p.ToLowerInvariant()}();");
                 } else
                 // If it is an immediate word, execute it outright and print whatever it returns.
                 if(immediates.TryGetValue(w, out Func<Vm, string>? f)) {
                     var s = f(vm);
-                    if(!String.IsNullOrEmpty(s)) sb.AppendLine(s);
+                    if(!String.IsNullOrEmpty(s)) _out.WriteLine(s);
                 } else
                 // If it is a created label, execute the appropiate 'does' code.
                 if(words.TryGetValue(w, out var does)) {
                     // Push address of the Created cell on the stack.
-                    sb.AppendLine($"vm.push(vm.addressof(\"{w}\"));");
+                    _out.WriteLine($"vm.push(vm.addressof(\"{w}\"));");
                     var s = does(vm);
-                    if(!String.IsNullOrEmpty(s)) sb.AppendLine(s);
+                    if(!String.IsNullOrEmpty(s)) _out.WriteLine(s);
                 } else
                 // If it is a number, push it.
                 if(cell.TryParse(w, out cell _)) {
-                    sb.AppendLine($"vm.push({w.ToLowerInvariant()});");
+                    _out.WriteLine($"vm.push({w.ToLowerInvariant()});");
                 } else
                 // If it is a word spelled the same as Forth, just emit it.
-                sb.AppendLine($"vm.{w.ToLowerInvariant()}();");
+                _out.WriteLine($"vm.{w.ToLowerInvariant()}();");
             }
         }
-        _out.Write(sb);
     }
 
 
