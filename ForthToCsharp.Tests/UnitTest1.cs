@@ -104,8 +104,8 @@ public class VmTest
         Assert.Equal(output, tw.ToString());
     }
     [Theory]
-    //[InlineData("10 20 +", 30)]
-    //[InlineData("create bob 20 ,\n bob @", 20)]
+    [InlineData("10 20 +", 30)]
+    [InlineData("create bob 20 ,\n bob @", 20)]
     [InlineData("create bob 10 allot\ncreate rob 20 ,\n rob @", 20)]
     public void Run(string forth, long result) {
         var csharp = Translator.ToCSharp(forth);

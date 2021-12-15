@@ -28,6 +28,7 @@ public class Translator
     };
 
     Dictionary<string, Func<Vm, string>> immediates;
+    Dictionary<string, Func<Vm, string>> words = new();
 
     const string prelude = @"
         static public partial class Forth {
@@ -41,26 +42,6 @@ public class Translator
     const string epilog = "}}";
 
 
-    // This gets complicated. A call to create defines a label for an index in the data space and
-    // an action to perform when the label is pushed.
-    struct Word {
-        public cellIndex location;
-        public Func<Vm, Word, string> does;
-    };
-
-    Dictionary<string, Word> words = new();
-
-    private string defaultDoes(Vm vm, Word w) {
-        return $"vm.push({w.location});";
-    }
-
-    /** Compile time words **/
-    private string Create(Vm vm) {
-        var name = GetNextWord(vm);
-        vm.here();
-        words[name] = new Word { location = (cellIndex)vm.pop(), does = defaultDoes };
-        return "";
-    }
     private string Colon(Vm vm) {
         return "";
     }
@@ -70,6 +51,11 @@ public class Translator
         vm.word();
         vm.count();
         return vm.dotNetString().ToLowerInvariant();
+    }
+    private string Create(Vm vm) {
+        var s = GetNextWord(vm);
+        words[s] = vm => ""; // The default 'does' for a word is not to do anything with address on stack.
+        return $"vm.create(\"{s}\");";
     }
     static public string ToCSharp(string forthCode) {
         if(String.IsNullOrEmpty(forthCode)) throw new ArgumentException("No forth code?");
@@ -110,8 +96,10 @@ public class Translator
                     if(!String.IsNullOrEmpty(s)) sb.AppendLine(s);
                 } else
                 // If it is a created label, execute the appropiate 'does' code.
-                if(words.TryGetValue(w, out Word word)) {
-                    var s = word.does(vm, word); // TODO: bizarre syntax. does is not a method of word.
+                if(words.TryGetValue(w, out var does)) {
+                    // Push address of the Created cell on the stack.
+                    sb.AppendLine($"vm.push(vm.addressof(\"{w}\"));");
+                    var s = does(vm);
                     if(!String.IsNullOrEmpty(s)) sb.AppendLine(s);
                 } else
                 // If it is a number, push it.

@@ -35,7 +35,7 @@ public class Vm
     /** Need to store a corrispondence between xt and the functions they refer to. **/
     Dictionary<cellIndex, Action> xts = new Dictionary<cellIndex, Action>();
 
-    public bool compiling;
+    Dictionary<string, cellIndex> words = new();
 
     /** Input/output buffer management **/
     TextWriter _output;
@@ -65,6 +65,12 @@ public class Vm
         // Initialize word buffer.
         _word = sysArray(WORD_MAX * CHAR_SIZE);
     }
+
+    [RE] public void create(string name) {
+        here();
+        words[name] = (cellIndex)pop();
+    }
+    [RE] public cellIndex addressof(string name) => words[name];
 
     /** Input/output area management **/
     [RE] public void type() {
@@ -204,7 +210,6 @@ public class Vm
         var (b, a) = pop2();
         push(a - b);
     }
-    [RE] public void state() => push(compiling ? TRUE : FALSE) ;
 
     [RE] public void dots() {
         Console.Write($"<{top}> ");
