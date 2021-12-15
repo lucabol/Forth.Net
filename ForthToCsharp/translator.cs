@@ -1,9 +1,9 @@
-﻿namespace ForthToCsharp;
-
-using cell      = System.Int64;
+﻿using cell      = System.Int64;
 using cellIndex = System.Int32;
 
 using System;
+using System.IO;
+using System.Collections.Generic;
 using System.Text;
 
 public class Translator
@@ -11,58 +11,117 @@ public class Translator
     TextReader _in;
     TextWriter _out;
 
-    public Translator(TextReader input, TextWriter output) => (_in, _out) = (input, output);
+    public Translator(TextReader input, TextWriter output) {
+        (_in, _out) = (input, output);
+        immediates = new() {
+            {"create", Create}
+        };
+    }
 
-    Dictionary<string, string> words = new () {
-        {"+", "plus"},
-        {"-", "minus"}
+    Dictionary<string, string> synonyms = new () {
+        {"+",   "plus"},
+        {"-",   "minus"},
+        {",",   "comma"},
+        {".",   "dot"},
+        {".s",  "dots"},
+        {"@",   "at"},
     };
 
-    Dictionary<string, Func<Vm, string>> immediates = new() {
-        {":", vm => "public void"
-        }
-    };
+    Dictionary<string, Func<Vm, string>> immediates;
 
-    const string prelude = @"using ForthToCsharp;
+    const string prelude = @"
         static public partial class Forth {
+            static public long Run() {
+                var vm = new Vm(System.Console.In, System.Console.Out);
+                Forth.Execute(vm);
+                return vm.pop();
+            }
             static public void Execute(Vm vm) {
         ";
     const string epilog = "}}";
 
+
+    // This gets complicated. A call to create defines a label for an index in the data space and
+    // an action to perform when the label is pushed.
+    struct Word {
+        public cellIndex location;
+        public Func<Vm, Word, string> does;
+    };
+
+    Dictionary<string, Word> words = new();
+
+    private string defaultDoes(Vm vm, Word w) {
+        return $"vm.push({w.location});";
+    }
+
+    /** Compile time words **/
+    private string Create(Vm vm) {
+        var name = GetNextWord(vm);
+        vm.here();
+        words[name] = new Word { location = (cellIndex)vm.pop(), does = defaultDoes };
+        return "";
+    }
+    private string Colon(Vm vm) {
+        return "";
+    }
+
+    private string GetNextWord(Vm vm) {
+        vm.bl();
+        vm.word();
+        vm.count();
+        return vm.dotNetString().ToLowerInvariant();
+    }
+    static public string ToCSharp(string forthCode) {
+        if(String.IsNullOrEmpty(forthCode)) throw new ArgumentException("No forth code?");
+
+        using TextReader tr = new StringReader(forthCode);
+        using TextWriter tw = new StringWriter();
+        var translator = new Translator(tr, tw);
+        tw.WriteLine(prelude);
+        translator.Translate();
+        tw.WriteLine(epilog);
+        var res = tw.ToString();
+        if(String.IsNullOrEmpty(res)) throw new ArgumentException("Error generating forth code.");
+        return res;
+    }
     public void Translate() {
         Vm vm = new(_in, _out);
         StringBuilder sb = new();
-        //sb.AppendLine(prelude);
 
         while(true) {
             // Fill the input buffer.
             vm.refill();
             if(vm.pop() == vm.ffalse()) break;
 
-            // Read the next word.
+            // Process the next word.
             while(true) {
-                vm.bl();
-                vm.word();
-                vm.count();
-                var w = vm.dotNetString();
+                var w = GetNextWord(vm);
                 // If we are at the end of the buffer start again reloading the input buffer.
                 if(String.IsNullOrEmpty(w)) break;
 
+                // TODO: is the order of checks below correct? I don't remember seeing it on ANS FORTH.
                 // If it is a word spelled differently than Forth (i.e., +) or a newly defined one, insert it.
-                if(words.TryGetValue(w, out string? p)) {
+                if(synonyms.TryGetValue(w, out string? p)) {
                     sb.AppendLine($"vm.{p.ToLowerInvariant()}();");
-                }
-
+                } else
+                // If it is an immediate word, execute it outright and print whatever it returns.
+                if(immediates.TryGetValue(w, out Func<Vm, string>? f)) {
+                    var s = f(vm);
+                    if(!String.IsNullOrEmpty(s)) sb.AppendLine(s);
+                } else
+                // If it is a created label, execute the appropiate 'does' code.
+                if(words.TryGetValue(w, out Word word)) {
+                    var s = word.does(vm, word); // TODO: bizarre syntax. does is not a method of word.
+                    if(!String.IsNullOrEmpty(s)) sb.AppendLine(s);
+                } else
                 // If it is a number, push it.
                 if(cell.TryParse(w, out cell _)) {
                     sb.AppendLine($"vm.push({w.ToLowerInvariant()});");
-                }
-
+                } else
                 // If it is a word spelled the same as Forth, just emit it.
                 sb.AppendLine($"vm.{w.ToLowerInvariant()}();");
             }
         }
-        //sb.AppendLine(epilog);
         _out.Write(sb);
     }
 

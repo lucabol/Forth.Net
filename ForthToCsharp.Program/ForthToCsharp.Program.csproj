@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\ForthToCsharp\ForthToCsharp.csproj" />
+      <!-- <ProjectReference Include="..\ForthToCsharp\ForthToCsharp.csproj" /> -->
   </ItemGroup>
 
   <PropertyGroup>

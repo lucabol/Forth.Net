@@ -1,10 +1,11 @@
-namespace ForthToCsharp;
-
 using cell      = System.Int64;
 using cellIndex = System.Int32;
 
 using System.Runtime.InteropServices;
 using static System.Console;
+using System;
+using System.IO;
+using System.Collections.Generic;
 
 public class REAttribute : Attribute { };
 

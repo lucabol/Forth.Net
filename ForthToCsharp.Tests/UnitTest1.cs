@@ -1,6 +1,6 @@
 using Xunit;
-using ForthToCsharp;
 using System.IO;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
 
 using static System.Console;
 using cell      = System.Int64;
@@ -92,13 +92,27 @@ public class VmTest
         } while(vm.pop() != vm.ffalse());
     }
 
-    [Fact]
-    public void Translate()
+    [Theory]
+    [InlineData("BL WORD COUNT DROP DROP", "vm.bl();\nvm.word();\nvm.count();\nvm.drop();\nvm.drop();\n")]
+    [InlineData("2 4 +", "vm.push(2);\nvm.push(4);\nvm.plus();\n")]
+    public void Translate(string input, string output)
     {
-        using TextReader tr = new StringReader("BL WORD COUNT DROP DROP");
+        using TextReader tr = new StringReader(input);
         using TextWriter tw = new StringWriter();
         var translator = new Translator(tr, tw);
         translator.Translate();
-        Assert.Equal("vm.bl();\nvm.word();\nvm.count();\nvm.drop();\nvm.drop();\n", tw.ToString());
+        Assert.Equal(output, tw.ToString());
+    }
+    [Theory]
+    //[InlineData("10 20 +", 30)]
+    //[InlineData("create bob 20 ,\n bob @", 20)]
+    [InlineData("create bob 10 allot\ncreate rob 20 ,\n rob @", 20)]
+    public void Run(string forth, long result) {
+        var csharp = Translator.ToCSharp(forth);
+        var vmCode = System.IO.File.ReadAllText("../../../../ForthToCsharp/vm.cs");
+        var code = vmCode + csharp;
+        File.WriteAllText("../../../../ForthToCsharp.Program/out.cs", code);
+        var res = CSharpScript.EvaluateAsync<long>(code + "Forth.Run()", null, null).Result;
+        Assert.Equal(result, res);
     }
 }
