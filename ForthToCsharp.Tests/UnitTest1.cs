@@ -99,6 +99,7 @@ public class VmTest
     {
         using TextReader tr = new StringReader(input);
         using TextWriter tw = new StringWriter();
+        tw.NewLine = "\n";
         var translator = new Translator(tr, tw);
         translator.Translate();
         Assert.Equal(output, tw.ToString());
