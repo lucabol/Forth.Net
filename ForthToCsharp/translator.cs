@@ -14,7 +14,9 @@ public class Translator
     public Translator(TextReader input, TextWriter output) {
         (_in, _out) = (input, output);
         immediates = new() {
-            {"create", Create}
+            {"create",  Create},
+            {":",       Colon},
+            {";",       SemiColon},
         };
     }
 
@@ -24,7 +26,10 @@ public class Translator
         {",",   "comma"},
         {".",   "dot"},
         {".s",  "dots"},
-        {"@",   "at"},
+        {"@",   "fetch"},
+        {"c@",  "cfetch"},
+        {"!",   "store"},
+        {"c!",  "cstore"},
     };
 
     Dictionary<string, Func<Vm, string>> immediates;
@@ -41,21 +46,38 @@ public class Translator
         ";
     const string epilog = "}}";
 
-
-    private string Colon(Vm vm) {
-        return "";
-    }
-
     private string GetNextWord(Vm vm) {
         vm.bl();
         vm.word();
         vm.count();
         return vm.dotNetString().ToLowerInvariant();
     }
+
+    private string SemiColon(Vm vm) {
+        vm.SetCompiling(false);
+        return "}";
+    }
+
+    private string Colon(Vm vm) {
+        vm.SetCompiling(true);
+        var name = GetNextWord(vm);
+        words[name] = vm => $"{name}();"; // Execute the word.
+        return $"vm.create(\"{name}\");\nvoid {name}() {{";
+    }
+
     private string Create(Vm vm) {
-        var s = GetNextWord(vm);
-        words[s] = vm => ""; // The default 'does' for a word is not to do anything with address on stack.
-        return $"vm.create(\"{s}\");";
+        if(!vm.IsCompiling()) {
+            var s = GetNextWord(vm);
+            // Push address of the Created cell on the stack.
+            words[s] = vm => $"vm.push(vm.addressof(\"{s}\"));";
+            return $"vm.create(\"{s}\");";
+        } else {
+            return @"
+    vm.word();
+    vm.count();
+    vm.create(vm.dotNetString());
+";
+        }
     }
     static public string ToCSharp(string forthCode) {
         if(String.IsNullOrEmpty(forthCode)) throw new ArgumentException("No forth code?");
@@ -96,8 +118,6 @@ public class Translator
                 } else
                 // If it is a created label, execute the appropiate 'does' code.
                 if(words.TryGetValue(w, out var does)) {
-                    // Push address of the Created cell on the stack.
-                    _out.WriteLine($"vm.push(vm.addressof(\"{w}\"));");
                     var s = does(vm);
                     if(!String.IsNullOrEmpty(s)) _out.WriteLine(s);
                 } else

@@ -37,8 +37,8 @@ public class VmTest
         vm.push(1); var h1 = here(vm); vm.comma();
         vm.push(2); var h2 = here(vm); vm.comma(); //ds: h1 = 1, h2 = 2
 
-        vm.push(h2); vm.at();
-        vm.push(h1); vm.at();
+        vm.push(h2); vm.fetch();
+        vm.push(h1); vm.fetch();
 
         Assert.Equal(1, vm.pop());
         Assert.Equal(2, vm.pop());
@@ -47,8 +47,8 @@ public class VmTest
         vm.cpush('a'); var ha = here(vm); vm.comma();
         vm.cpush('b'); var hb = here(vm); vm.comma();
 
-        vm.push(ha); vm.at();
-        vm.push(hb); vm.at();
+        vm.push(ha); vm.fetch();
+        vm.push(hb); vm.fetch();
 
         Assert.Equal('b', vm.pop());
         Assert.Equal('a', vm.pop());
@@ -108,6 +108,8 @@ public class VmTest
     [InlineData("10 20 +", 30)]
     [InlineData("create bob 20 ,\n bob @", 20)]
     [InlineData("create bob 10 allot\ncreate rob 20 ,\n rob @", 20)]
+    [InlineData(": myplus1 1 + ; \n 20 myplus1", 21)]
+    [InlineData(": uarray create allot ;\n80 uarray ar\n 10 ar + 100 ! 10 ar + @", 100)]
     public void Run(string forth, long result) {
         var csharp = Translator.ToCSharp(forth);
         var vmCode = System.IO.File.ReadAllText("../../../../ForthToCsharp/vm.cs");

@@ -47,6 +47,9 @@ public class Vm
     /** word buffer management **/
     cellIndex _word;
 
+    /** state: compiling -> true, interpreting -> false **/
+    cellIndex _state;
+
     /** allocate a system array **/
     private cellIndex sysArray(cellIndex n) {
         var h = here_p;
@@ -64,9 +67,27 @@ public class Vm
 
         // Initialize word buffer.
         _word = sysArray(WORD_MAX * CHAR_SIZE);
+
+        // Initialize state.
+        _state = here_p;
+        push(ffalse());
+        comma();
     }
 
+    public bool IsCompiling() {
+        state(); fetch();
+        return pop() == ftrue() ? true : false;
+    }
+    public void SetCompiling(bool compiling) {
+        push(compiling ? ftrue() : ffalse());
+        state();
+        store();
+    }
+
+    [RE] public void state() => push(_state);
+
     [RE] public void create(string name) {
+        align();
         here();
         words[name] = (cellIndex)pop();
     }
@@ -86,7 +107,7 @@ public class Vm
     }
     [RE] public void count() {
         dup();
-        cat();
+        cfetch();
         var c = popi();
         var a = popi();
 
@@ -156,11 +177,23 @@ public class Vm
         MemoryMarshal.Write<cell>(s, ref c);
         here_p = end;
     }
-    [RE] public void at() {
+    [RE] public void fetch() {
         cellIndex c = popi();
         var s = new Span<byte>(ds, c, CELL_SIZE);
         var value = MemoryMarshal.Read<cell>(s);
         push(value);
+    }
+    [RE] public void store() {
+        cellIndex c = popi();
+        var s = new Span<byte>(ds, c, CELL_SIZE);
+        var v = pop();
+        MemoryMarshal.Write<cell>(s, ref v);
+    }
+    [RE] public void cstore() {
+        cellIndex c = popi();
+        var s = new Span<byte>(ds, c, CELL_SIZE);
+        var v = (char)pop();
+        MemoryMarshal.Write<char>(s, ref v);
     }
     [RE] public void ccomma() {
         char c = (char)pop();
@@ -169,7 +202,7 @@ public class Vm
         MemoryMarshal.Write<char>(s, ref c);
         here_p = end;
     }
-    [RE] public void cat() {
+    [RE] public void cfetch() {
         cellIndex c = popi();
         var s = new Span<byte>(ds, c, CHAR_SIZE);
         var value = MemoryMarshal.Read<char>(s);
