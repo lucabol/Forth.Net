@@ -19,6 +19,7 @@ public class Translator {
     public StringBuilder compile;
     public TextReader inputReader;
     public Queue<string> inputWords = new();
+    public string lastWord = "";
 
     // State of the interpret.
     public bool Interpreting = true;
@@ -47,11 +48,16 @@ public class Translator {
         if(tr.Interpreting) {
             var s = tr.NextWord();
             if(s == null) throw new Exception("End of input stream after defining word");
+            tr.lastWord = s;
             tr.interpr.AppendLine(ToCsharpInst("_labelHere", $"\"{s}\""));
         } else {
             var label = ToCsharpInst("_labelHere", "s");
             tr.compile.AppendLine($"{{;bl;word;count;sstring;{label};}}");
         }
+    }
+    public static void ColonDef(Word w, Translator tr) {
+        tr.Interpreting = false;
+        CreateDef(w, tr);
     }
     public static bool IsIdentifier(string text)
     {

@@ -52,6 +52,9 @@ public struct Vm
     // Word buffer management.
     public int word;
 
+    // Last defined word;
+    public string lastWord = "";
+
     // state: compiling -> true, interpreting -> false.
     public int state = 0;
 
@@ -259,6 +262,7 @@ public static partial class VmExt
         return s.ToString();
     }
     [RE]public static void _labelHere(ref Vm vm, string s) {
+        vm.lastWord = s;
         vm.words[s] = vm.here_p;
     }
 
