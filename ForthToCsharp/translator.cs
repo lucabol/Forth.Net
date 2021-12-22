@@ -10,6 +10,7 @@ public struct Word {
     public string     lastWordName;
     public Definition def;
     public bool       immediate;
+    public bool       export;
 }
 
 public class Translator {
@@ -65,16 +66,23 @@ public class Translator {
             else sb.Append(c);
         return sb.ToString();
     }
-    public static Word ft(string word, string instructions) => new Word {
-        lastWordName = ToCsharpId(word), immediate = false, def = (word, tr) => {
-            var fullInst = ToInstStream(instructions);
+    public static Word inline(string instructions) => new Word {
+        lastWordName = "", immediate = false, export = false, def = (word, tr) => {
+            var fullInst = $"{{\n{ToInstStream(instructions)}\n}}";
             if(tr.Interpreting) tr.interpr.AppendLine(fullInst);
             else                tr.compile.AppendLine(fullInst);
         }
     };
 
+    public static Word intrinsic(string name) => new Word {
+        lastWordName = name, immediate = false, export = true, def = (word, tr) => {
+            var csharp = $"{ToCsharpId(name)}(ref vm);";
+            if(tr.Interpreting) tr.interpr.AppendLine(csharp);
+            else                tr.compile.AppendLine(csharp);
+        }
+    };
     public static void PushNumber(string n, Translator tr) {
-        var s = $"vm.push({n})";
+        var s = $"push(ref vm, {n});";
         if(tr.Interpreting) tr.interpr.AppendLine(s); else tr.compile.AppendLine(s);
     }
 
@@ -96,9 +104,49 @@ public class Translator {
         Translate(tr);
         return (tr.interpr.ToString(), tr.compile.ToString());
     }
+
+    public static string ToCSharp(string funcName, string interpret, string compile) =>
+        $@"
+        static public partial class VmExt {{
+            static public long Test{funcName}() {{
+                var vm = new Vm(System.Console.In, System.Console.Out);
+                {funcName}(ref vm);
+                var res = pop(ref vm);
+                depth(ref vm);
+                var zero = pop(ref vm);
+                return res + zero;
+            }}
+            {compile}
+            static public void {funcName} (ref Vm vm) {{
+                {interpret}
+            }}
+        }}
+        ";
+
     // The Forth dictionary.
     public Dictionary<string, Word> words = new() {
-            {"+", ft("plus_0", "popa;popb;var c = a + b;pushc;") }
+            {"+"       ,  inline("popa;popb;var c = a + b;pushc;") },
+            {"dup"     ,  intrinsic("dup")},
+            {"dup2"    ,  intrinsic("dup2")},
+            {"drop"    ,  intrinsic("drop")},
+            {"drop2"   ,  intrinsic("drop2")},
+            {"cells"   ,  intrinsic("cells")},
+            {"here"    ,  intrinsic("here")},
+            {"@"       ,  intrinsic("_fetch")},
+            {"c@"      ,  intrinsic("_cfetch")},
+            {"!"       ,  intrinsic("_store")},
+            {"c!"      ,  intrinsic("_cstore")},
+            {","       ,  intrinsic("_comma")},
+            {"c,"      ,  intrinsic("_ccomma")},
+            {"allot"   ,  intrinsic("allot")},
+            {"align"   ,  intrinsic("align")},
+            {"aligned" ,  intrinsic("aligned")},
+            {"type"    ,  intrinsic("type")},
+            {"source"  ,  intrinsic("source")},
+            {"count"   ,  intrinsic("count")},
+            {"refill"  ,  intrinsic("refill")},
+            {"word"    ,  intrinsic("word")},
+            {"bl"      ,  intrinsic("bl")},
         };
 
     // Maps symbols to words
@@ -108,11 +156,20 @@ public class Translator {
     };
 
     public static Dictionary<string, string> specialInsts = new() {
-        {"popa", "var a = vm.pop()"},
-        {"popb", "var b = vm.pop()"},
-        {"popc", "var c = vm.pop()"},
-        {"pusha", "vm.push(a)"},
-        {"pushb", "vm.push(b)"},
-        {"pushc", "vm.push(c)"},
+        {"popa", "var a = pop(ref vm)"},
+        {"popb", "var b = pop(ref vm)"},
+        {"popc", "var c = pop(ref vm)"},
+
+        {"cpopa", "var aa = cpop(ref vm)"},
+        {"cpopb", "var bb = cpop(ref vm)"},
+        {"cpopc", "var cc = cpop(ref vm)"},
+
+        {"pusha", "push(ref vm, a)"},
+        {"pushb", "push(ref vm, b)"},
+        {"pushc", "push(ref vm, c)"},
+
+        {"cpusha", "cpush(ref vm, ca)"},
+        {"cpushb", "cpush(ref vm, cb)"},
+        {"cpushc", "cpush(ref vm, cc)"},
     };
 }

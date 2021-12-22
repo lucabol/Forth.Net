@@ -47,12 +47,12 @@ public struct Vm {
     // state: compiling -> true, interpreting -> false.
     public int state = 0;
 
-    public Vm(int ps_max_cells,
-              int ds_max_bytes,
-              int source_max_chars,
-              int word_max_chars,
-              TextReader input,
-              TextWriter output) {
+    public Vm(TextReader input,
+              TextWriter output,
+              int ps_max_cells = 64,
+              int ds_max_bytes = 64 * 1_024,
+              int source_max_chars = 1_024,
+              int word_max_chars = 31) {
 
         ps = new nint[ps_max_cells * CELL_SIZE];
         ds = new byte[ds_max_bytes];
@@ -73,116 +73,117 @@ public struct Vm {
 public static partial class VmExt {
 
     // Parameter Stack manipulation implementation routines. Not checking array boundaries as .net does it for me.
-    [RE] private static void push(this ref Vm vm, nint c) => vm.ps[vm.top++] = c;
-    [RE] private static nint pop(this ref Vm vm) => vm.ps[--vm.top];
-    [RE] private static int popi(this ref Vm vm) => (int)vm.ps[--vm.top];
-    [RE] private static void cpush(this ref Vm vm, char c) => vm.ps[vm.top++] = (nint)c;
-    [RE] private static char cpop(this ref Vm vm) => (char)vm.ps[--vm.top];
-    [RE] private static (nint, nint) pop2(this ref Vm vm) => (vm.ps[--vm.top], vm.ps[--vm.top]);
+    [RE] public static void depth(ref Vm vm) => push(ref vm, vm.top);
+    [RE] private static void push(ref Vm vm, nint c) => vm.ps[vm.top++] = c;
+    [RE] private static nint pop(ref Vm vm) => vm.ps[--vm.top];
+    [RE] private static int popi(ref Vm vm) => (int)vm.ps[--vm.top];
+    [RE] private static void cpush(ref Vm vm, char c) => vm.ps[vm.top++] = (nint)c;
+    [RE] private static char cpop(ref Vm vm) => (char)vm.ps[--vm.top];
+    [RE] private static (nint, nint) pop2(ref Vm vm) => (vm.ps[--vm.top], vm.ps[--vm.top]);
 
     // Private stack manipulation routines.
-    [RE] public static void cells(this ref Vm vm) => vm.push(vm.CELL_SIZE);
-    [RE] public static void drop(this ref Vm vm) => vm.pop();
-    [RE] public static void drop2(this ref Vm vm) { vm.pop(); vm.pop();}
-    [RE] public static void dup(this ref Vm vm) { var x = vm.pop(); vm.push(x); vm.push(x);}
-    [RE] public static void dup2(this ref Vm vm) { var (x, y) = (vm.pop(), vm.pop()); vm.push(y);vm.push(x);vm.push(y);vm.push(x);}
+    [RE] public static void cells(ref Vm vm) => push(ref vm, vm.CELL_SIZE);
+    [RE] public static void drop(ref Vm vm) => pop(ref vm);
+    [RE] public static void drop2(ref Vm vm) { pop(ref vm); pop(ref vm);}
+    [RE] public static void dup(ref Vm vm) { var x = pop(ref vm); push(ref vm, x); push(ref vm, x);}
+    [RE] public static void dup2(ref Vm vm) { var (x, y) = (pop(ref vm), pop(ref vm)); push(ref vm, y);push(ref vm, x);push(ref vm, y);push(ref vm, x);}
 
     // Data Space manipulation routines.
-    [RE] public static void here(this ref Vm vm) => vm.push(vm.here_p);
-    [RE] public static void _fetch(this ref Vm vm) {
-        int c = vm.popi();
+    [RE] public static void here(ref Vm vm) => push(ref vm, vm.here_p);
+    [RE] public static void _fetch(ref Vm vm) {
+        int c = popi(ref vm);
         var s = new Span<byte>(vm.ds, c, vm.CELL_SIZE);
         var value = MemoryMarshal.Read<nint>(s);
-        vm.push(value);
+        push(ref vm, value);
     }
-    [RE] public static void _store(this ref Vm vm) {
-        int c = vm.popi();
+    [RE] public static void _store(ref Vm vm) {
+        int c = popi(ref vm);
         var s = new Span<byte>(vm.ds, c, vm.CELL_SIZE);
-        var v = vm.pop();
+        var v = pop(ref vm);
         MemoryMarshal.Write<nint>(s, ref v);
     }
-    [RE] public static void _comma(this ref Vm vm) {
-        vm.here();
-        vm._store();
+    [RE] public static void _comma(ref Vm vm) {
+        here(ref vm);
+        _store(ref vm);
     }
-    [RE] public static void _cstore(this ref Vm vm) {
-        int c = vm.popi();
+    [RE] public static void _cstore(ref Vm vm) {
+        int c = popi(ref vm);
         var s = new Span<byte>(vm.ds, c, vm.CELL_SIZE);
-        var v = (char)vm.pop();
+        var v = (char)pop(ref vm);
         MemoryMarshal.Write<char>(s, ref v);
     }
-    [RE] public static void _ccomma(this ref Vm vm) {
-        vm.here();
-        vm._cstore();
+    [RE] public static void _ccomma(ref Vm vm) {
+        here(ref vm);
+        _cstore(ref vm);
     }
-    [RE] public static void _cfetch(this ref Vm vm) {
-        int c = vm.popi();
+    [RE] public static void _cfetch(ref Vm vm) {
+        int c = popi(ref vm);
         var s = new Span<byte>(vm.ds, c, Vm.CHAR_SIZE);
         var value = MemoryMarshal.Read<char>(s);
-        vm.push((nint)value);
+        push(ref vm, (nint)value);
     }
-    [RE] public static void allot(this ref Vm vm) {
-        var n = vm.popi();
+    [RE] public static void allot(ref Vm vm) {
+        var n = popi(ref vm);
         vm.here_p = vm.here_p + n;
     }
     private static int _align(int n, int alignment) => (n + (alignment -1)) & ~(alignment - 1);
-    [RE] public static void align(this ref Vm vm) => vm.here_p = _align(vm.here_p, vm.CELL_SIZE);
-    [RE] public static void aligned(this ref Vm vm) { var n = vm.popi(); vm.push(_align(n, vm.CELL_SIZE)); }
+    [RE] public static void align(ref Vm vm) => vm.here_p = _align(vm.here_p, vm.CELL_SIZE);
+    [RE] public static void aligned(ref Vm vm) { var n = popi(ref vm); push(ref vm, _align(n, vm.CELL_SIZE)); }
 
     // Input/Word manipulation routines.
 
     /** Input/output area management **/
-    [RE] public static void type(this ref Vm vm) {
-        var l = vm.popi();
-        var a = vm.popi();
-        var chars = vm.ToChars(a, l);
+    [RE] public static void type(ref Vm vm) {
+        var l = popi(ref vm);
+        var a = popi(ref vm);
+        var chars = ToChars(ref vm, a, l);
         vm.output.Write(chars.ToString());
     }
 
-    [RE] public static void source(this ref Vm vm) {
-        vm.push(vm.source);
-        vm.push(vm.input_len_chars);
+    [RE] public static void source(ref Vm vm) {
+        push(ref vm, vm.source);
+        push(ref vm, vm.input_len_chars);
     }
-    [RE] public static void count(this ref Vm vm) {
-        vm.dup();
-        vm._cfetch();
-        var c = vm.popi();
-        var a = vm.popi();
+    [RE] public static void count(ref Vm vm) {
+        dup(ref vm);
+        _cfetch(ref vm);
+        var c = popi(ref vm);
+        var a = popi(ref vm);
 
-        vm.push(a + Vm.CHAR_SIZE);
-        vm.push(c);
+        push(ref vm, a + Vm.CHAR_SIZE);
+        push(ref vm, c);
     }
-    public static string dotNetString(this ref Vm vm)
+    public static string dotNetString(ref Vm vm)
     {
-        var c = vm.popi();
-        var a = vm.popi();
-        var s = vm.ToChars(a, c);
+        var c = popi(ref vm);
+        var a = popi(ref vm);
+        var s = ToChars(ref vm, a, c);
         return s.ToString();
     }
-    private static Span<Char> ToChars(this ref Vm vm, int sourceIndex, int lengthInChars) {
+    private static Span<Char> ToChars(ref Vm vm, int sourceIndex, int lengthInChars) {
             var inputByteSpan = vm.ds.AsSpan((int)sourceIndex, (int)lengthInChars * Vm.CHAR_SIZE);
             return MemoryMarshal.Cast<byte, char>(inputByteSpan);
     }
-    [RE] public static void refill(this ref Vm vm) {
+    [RE] public static void refill(ref Vm vm) {
         var s = vm.input.ReadLine();
         if(s == null) {
-            vm.push(Vm.FALSE);
+            push(ref vm, Vm.FALSE);
         } else {
             var len = s.Length;
             if(len > vm.source_max_chars)
                 throw new Exception(
                 $"Cannot parse a line longer than {vm.source_max_chars}. {s} is {len} chars long.");
-            var inputCharSpan = vm.ToChars(vm.source, vm.source_max_chars);
+            var inputCharSpan = ToChars(ref vm, vm.source, vm.source_max_chars);
             s.CopyTo(inputCharSpan);
             vm.inp = 0;
             vm.input_len_chars = len;
-            vm.push(Vm.TRUE);
+            push(ref vm, Vm.TRUE);
         }
     }
-    [RE] public static void word(this ref Vm vm) {
-        var delim = (char)vm.pop();
-        var s = vm.ToChars(vm.source, vm.input_len_chars);
-        var w = vm.ToChars(vm.word, vm.word_max_chars);
+    [RE] public static void word(ref Vm vm) {
+        var delim = (char)pop(ref vm);
+        var s = ToChars(ref vm, vm.source, vm.input_len_chars);
+        var w = ToChars(ref vm, vm.word, vm.word_max_chars);
 
         var j = 1; // It is a counted string, the first 2 bytes conains the length
 
@@ -191,7 +192,7 @@ public static partial class VmExt {
         // If all spaces to the end of the input, return a string with length 0. 
         if(vm.inp >= vm.input_len_chars) {
             w[0] = (char) 0;
-            vm.push(vm.word);
+            push(ref vm, vm.word);
             return;
         }
 
@@ -203,9 +204,9 @@ public static partial class VmExt {
         if(j >= vm.input_len_chars) throw new Exception($"Word longer than {vm.input_len_chars}: {s}");
 
         w[0] = (char) (j - 1);  // len goes into the first char
-        vm.push(vm.word);
+        push(ref vm, vm.word);
     }
-    [RE] public static void bl(this ref Vm vm) {
-        vm.push((nint)' ');
+    [RE] public static void bl(ref Vm vm) {
+        push(ref vm, (nint)' ');
     }
 }
