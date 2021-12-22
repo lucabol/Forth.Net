@@ -18,6 +18,7 @@ public class Translator {
     public StringBuilder interpr;
     public StringBuilder compile;
     public TextReader inputReader;
+    public Queue<string> inputWords = new();
 
     // State of the interpret.
     public bool Interpreting = true;
@@ -28,17 +29,30 @@ public class Translator {
         this.inputReader = inputReader;
     }
 
-    public IEnumerable<string> InputWords() {
-        while(true) {
+    // I can't use an iterator returning method because CreateWord need access to the next word.
+    public string? NextWord() {
+        while(inputWords.Count == 0) {
             var line = inputReader.ReadLine();
-            if(line == null) yield break; // end of stream
+            if(line == null) return null;
 
             // The strange empty array is an optimized way to split on system specific whitespace.
             var ss = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-            foreach(var s in ss) yield return s;
+            foreach(var s in ss) inputWords.Enqueue(s);
         }
+        return inputWords.Dequeue();
     }
 
+    public static void CreateDef(Word w, Translator tr) {
+        // TODO: this is very akward (wrong?). My brain hurts.
+        if(tr.Interpreting) {
+            var s = tr.NextWord();
+            if(s == null) throw new Exception("End of input stream after defining word");
+            tr.interpr.AppendLine(ToCsharpInst("_labelHere", $"\"{s}\""));
+        } else {
+            var label = ToCsharpInst("_labelHere", "s");
+            tr.compile.AppendLine($"{{;bl;word;count;sstring;{label};}}");
+        }
+    }
     public static bool IsIdentifier(string text)
     {
        if (string.IsNullOrEmpty(text))                return false;
@@ -57,6 +71,10 @@ public class Translator {
         return inst;
     }
 
+    public static string ToCsharpInst(string inst, string arg) {
+        if(!IsIdentifier(inst)) throw new Exception($"{inst} not an identifier");
+        return $"VmExt.{inst}(ref vm, {arg});";
+    }
     public static string ToInstStream(string words) => String.Join(";\n", words.Split(';').Select(ToCsharpInst));
 
     public static string ToCsharpId(string forthId) {
@@ -81,6 +99,9 @@ public class Translator {
             else                tr.compile.AppendLine(csharp);
         }
     };
+    public static Word function(Definition f) => new Word {
+        lastWordName = "", immediate = false, export = true, def = f };
+
     public static void PushNumber(string n, Translator tr) {
         var s = $"VmExt.push(ref vm, {n});";
         if(tr.Interpreting) tr.interpr.AppendLine(s); else tr.compile.AppendLine(s);
@@ -91,11 +112,22 @@ public class Translator {
             v.def(v, tr);
         } else if(nint.TryParse(word, out var _)) {
             PushNumber(word, tr);
-        } else
-        throw new Exception($"{word} is not in the dictionary");
+        } else { // Might be a defined word.
+            InsertDo(word, tr);
+        }
     }
+    public static void InsertDo(string word, Translator tr) {
+        var wr = tr.Interpreting ? tr.interpr : tr.compile;
+        wr.AppendLine(ToCsharpInst("_do", $"\"{word}\""));
+    }
+
     public static void Translate(Translator tr) {
-        foreach(var w in tr.InputWords()) TranslateWord(w, tr);
+        while(true) {
+            var word = tr.NextWord();
+            if(word == null) break;
+
+            TranslateWord(word, tr);
+        }
     }
     public static (string,string) TranslateString(string forthCode) {
         var isb = new StringBuilder();
@@ -126,6 +158,7 @@ public class Translator {
     // The Forth dictionary.
     public Dictionary<string, Word> words = new() {
             {"+"       ,  inline("popa;popb;var c = a + b;pushc;") },
+
             {"dup"     ,  intrinsic("dup")},
             {"dup2"    ,  intrinsic("dup2")},
             {"drop"    ,  intrinsic("drop")},
@@ -147,6 +180,11 @@ public class Translator {
             {"refill"  ,  intrinsic("refill")},
             {"word"    ,  intrinsic("word")},
             {"bl"      ,  intrinsic("bl")},
+            {"_do"     ,  intrinsic("_do")},
+
+            {"_labelHere"      ,  intrinsic("_labelHere")},
+
+            {"create"  ,  function(CreateDef)},
         };
 
     // Maps symbols to words
@@ -171,5 +209,6 @@ public class Translator {
         {"cpusha", "VmExt.cpush(ref vm, ca)"},
         {"cpushb", "VmExt.cpush(ref vm, cb)"},
         {"cpushc", "VmExt.cpush(ref vm, cc)"},
+        {"sstring", "var s = VmExt.dotNetString(ref vm)"},
     };
 }
