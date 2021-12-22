@@ -1,135 +1,118 @@
-﻿using cell      = System.Int64;
-using cellIndex = System.Int32;
-
 using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 
-public class Translator
-{
-    TextReader _in;
-    TextWriter _out;
+public delegate void Definition(Word w, Translator tr);
 
-    public Translator(TextReader input, TextWriter output) {
-        (_in, _out) = (input, output);
-        immediates = new() {
-            {"create",  Create},
-            {":",       Colon},
-            {";",       SemiColon},
-        };
+public struct Word {
+    public string     lastWordName;
+    public Definition def;
+    public bool       immediate;
+}
+
+public class Translator {
+    // Input and outputs.
+    public StringBuilder interpr;
+    public StringBuilder compile;
+    public TextReader inputReader;
+
+    // State of the interpret.
+    public bool Interpreting = true;
+
+    public Translator(TextReader inputReader, StringBuilder interpr, StringBuilder compile) {
+        this.interpr = interpr;
+        this.compile = compile;
+        this.inputReader = inputReader;
     }
 
-    Dictionary<string, string> synonyms = new () {
-        {"+",   "plus"},
-        {"-",   "minus"},
-        {",",   "comma"},
-        {".",   "dot"},
-        {".s",  "dots"},
-        {"@",   "fetch"},
-        {"c@",  "cfetch"},
-        {"!",   "store"},
-        {"c!",  "cstore"},
+    public IEnumerable<string> InputWords() {
+        while(true) {
+            var line = inputReader.ReadLine();
+            if(line == null) yield break; // end of stream
+
+            // The strange empty array is an optimized way to split on system specific whitespace.
+            var ss = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
+            foreach(var s in ss) yield return s;
+        }
+    }
+
+    public static bool IsIdentifier(string text)
+    {
+       if (string.IsNullOrEmpty(text))                return false;
+       if (!char.IsLetter(text[0]) && text[0] != '_') return false;
+
+       for (int ix = 1; ix < text.Length; ++ix)
+          if (!char.IsLetterOrDigit(text[ix]) && text[ix] != '_')
+             return false;
+
+       return true;
+    }
+
+    public static string ToCsharpInst(string inst) {
+        if(specialInsts.TryGetValue(inst, out var v)) return v;
+        if(IsIdentifier(inst))                        return $"vm.{inst}()";
+        return inst;
+    }
+
+    public static string ToInstStream(string words) => String.Join(";\n", words.Split(';').Select(ToCsharpInst));
+
+    public static string ToCsharpId(string forthId) {
+        StringBuilder sb = new();
+        foreach(var c in forthId)
+            if(sym.TryGetValue(c, out var v)) sb.Append($"_{v}");
+            else sb.Append(c);
+        return sb.ToString();
+    }
+    public static Word ft(string word, string instructions) => new Word {
+        lastWordName = ToCsharpId(word), immediate = false, def = (word, tr) => {
+            var fullInst = ToInstStream(instructions);
+            if(tr.Interpreting) tr.interpr.AppendLine(fullInst);
+            else                tr.compile.AppendLine(fullInst);
+        }
     };
 
-    Dictionary<string, Func<Vm, string>> immediates;
-    Dictionary<string, Func<Vm, string>> words = new();
-
-    const string prelude = @"
-        static public partial class Forth {
-            static public long Run() {
-                var vm = new Vm(System.Console.In, System.Console.Out);
-                Forth.Execute(vm);
-                return vm.pop();
-            }
-            static public void Execute(Vm vm) {
-        ";
-    const string epilog = "}}";
-
-    private string GetNextWord(Vm vm) {
-        vm.bl();
-        vm.word();
-        vm.count();
-        return vm.dotNetString().ToLowerInvariant();
+    public static void PushNumber(string n, Translator tr) {
+        var s = $"vm.push({n})";
+        if(tr.Interpreting) tr.interpr.AppendLine(s); else tr.compile.AppendLine(s);
     }
 
-    private string SemiColon(Vm vm) {
-        vm.SetCompiling(false);
-        return "}";
+    public static void TranslateWord(string word, Translator tr) {
+        if(tr.words.TryGetValue(word, out var v)) {
+            v.def(v, tr);
+        } else if(nint.TryParse(word, out var _)) {
+            PushNumber(word, tr);
+        } else
+        throw new Exception($"{word} is not in the dictionary");
     }
-
-    private string Colon(Vm vm) {
-        vm.SetCompiling(true);
-        var name = GetNextWord(vm);
-        words[name] = vm => $"{name}();"; // Execute the word.
-        return $"vm.create(\"{name}\");\nvoid {name}() {{";
+    public static void Translate(Translator tr) {
+        foreach(var w in tr.InputWords()) TranslateWord(w, tr);
     }
-
-    private string Create(Vm vm) {
-        if(!vm.IsCompiling()) {
-            var s = GetNextWord(vm);
-            // Push address of the Created cell on the stack.
-            words[s] = vm => $"vm.push(vm.addressof(\"{s}\"));";
-            return $"vm.create(\"{s}\");";
-        } else {
-            return @"
-    vm.word();
-    vm.count();
-    vm.create(vm.dotNetString());
-";
-        }
+    public static (string,string) TranslateString(string forthCode) {
+        var isb = new StringBuilder();
+        var csb = new StringBuilder();
+        var tr = new Translator(new StringReader(forthCode), isb, csb);
+        Translate(tr);
+        return (tr.interpr.ToString(), tr.compile.ToString());
     }
-    static public string ToCSharp(string forthCode) {
-        if(String.IsNullOrEmpty(forthCode)) throw new ArgumentException("No forth code?");
+    // The Forth dictionary.
+    public Dictionary<string, Word> words = new() {
+            {"+", ft("plus_0", "popa;popb;var c = a + b;pushc;") }
+        };
 
-        using TextReader tr = new StringReader(forthCode);
-        using TextWriter tw = new StringWriter();
-        var translator = new Translator(tr, tw);
-        tw.WriteLine(prelude);
-        translator.Translate();
-        tw.WriteLine(epilog);
-        var res = tw.ToString();
-        if(String.IsNullOrEmpty(res)) throw new ArgumentException("Error generating forth code.");
-        return res;
-    }
-    public void Translate() {
-        Vm vm = new(_in, _out);
+    // Maps symbols to words
+    public static Dictionary<char, string> sym = new() {
+        {'+', "plus"},
+        {'-', "minus"}
+    };
 
-        while(true) {
-            // Fill the input buffer.
-            vm.refill();
-            if(vm.pop() == vm.ffalse()) break;
-
-            // Process the next word.
-            while(true) {
-                var w = GetNextWord(vm);
-                // If we are at the end of the buffer start again reloading the input buffer.
-                if(String.IsNullOrEmpty(w)) break;
-
-                // TODO: is the order of checks below correct? I don't remember seeing it on ANS FORTH.
-                // If it is a word spelled differently than Forth (i.e., +) or a newly defined one, insert it.
-                if(synonyms.TryGetValue(w, out string? p)) {
-                    _out.WriteLine($"vm.{p.ToLowerInvariant()}();");
-                } else
-                // If it is an immediate word, execute it outright and print whatever it returns.
-                if(immediates.TryGetValue(w, out Func<Vm, string>? f)) {
-                    var s = f(vm);
-                    if(!String.IsNullOrEmpty(s)) _out.WriteLine(s);
-                } else
-                // If it is a created label, execute the appropiate 'does' code.
-                if(words.TryGetValue(w, out var does)) {
-                    var s = does(vm);
-                    if(!String.IsNullOrEmpty(s)) _out.WriteLine(s);
-                } else
-                // If it is a number, push it.
-                if(cell.TryParse(w, out cell _)) {
-                    _out.WriteLine($"vm.push({w.ToLowerInvariant()});");
-                } else
-                // If it is a word spelled the same as Forth, just emit it.
-                _out.WriteLine($"vm.{w.ToLowerInvariant()}();");
-            }
-        }
-    }
-
-
+    public static Dictionary<string, string> specialInsts = new() {
+        {"popa", "var a = vm.pop()"},
+        {"popb", "var b = vm.pop()"},
+        {"popc", "var c = vm.pop()"},
+        {"pusha", "vm.push(a)"},
+        {"pushb", "vm.push(b)"},
+        {"pushc", "vm.push(c)"},
+    };
 }
