@@ -53,7 +53,7 @@ public class Translator {
 
     public static string ToCsharpInst(string inst) {
         if(specialInsts.TryGetValue(inst, out var v)) return v;
-        if(IsIdentifier(inst))                        return $"vm.{inst}()";
+        if(IsIdentifier(inst))                        return $"VmExt.{inst}(ref vm);";
         return inst;
     }
 
@@ -76,13 +76,13 @@ public class Translator {
 
     public static Word intrinsic(string name) => new Word {
         lastWordName = name, immediate = false, export = true, def = (word, tr) => {
-            var csharp = $"{ToCsharpId(name)}(ref vm);";
+            var csharp = ToCsharpInst(name);
             if(tr.Interpreting) tr.interpr.AppendLine(csharp);
             else                tr.compile.AppendLine(csharp);
         }
     };
     public static void PushNumber(string n, Translator tr) {
-        var s = $"push(ref vm, {n});";
+        var s = $"VmExt.push(ref vm, {n});";
         if(tr.Interpreting) tr.interpr.AppendLine(s); else tr.compile.AppendLine(s);
     }
 
@@ -107,13 +107,13 @@ public class Translator {
 
     public static string ToCSharp(string funcName, string interpret, string compile) =>
         $@"
-        static public partial class VmExt {{
+        static public partial class __GEN {{
             static public long Test{funcName}() {{
                 var vm = new Vm(System.Console.In, System.Console.Out);
                 {funcName}(ref vm);
-                var res = pop(ref vm);
-                depth(ref vm);
-                var zero = pop(ref vm);
+                var res = VmExt.pop(ref vm);
+                VmExt.depth(ref vm);
+                var zero = VmExt.pop(ref vm);
                 return res + zero;
             }}
             {compile}
@@ -156,20 +156,20 @@ public class Translator {
     };
 
     public static Dictionary<string, string> specialInsts = new() {
-        {"popa", "var a = pop(ref vm)"},
-        {"popb", "var b = pop(ref vm)"},
-        {"popc", "var c = pop(ref vm)"},
+        {"popa", "var a = VmExt.pop(ref vm)"},
+        {"popb", "var b = VmExt.pop(ref vm)"},
+        {"popc", "var c = VmExt.pop(ref vm)"},
 
-        {"cpopa", "var aa = cpop(ref vm)"},
-        {"cpopb", "var bb = cpop(ref vm)"},
-        {"cpopc", "var cc = cpop(ref vm)"},
+        {"cpopa", "var aa = VmExt.cpop(ref vm)"},
+        {"cpopb", "var bb = VmExt.cpop(ref vm)"},
+        {"cpopc", "var cc = VmExt.cpop(ref vm)"},
 
-        {"pusha", "push(ref vm, a)"},
-        {"pushb", "push(ref vm, b)"},
-        {"pushc", "push(ref vm, c)"},
+        {"pusha", "VmExt.push(ref vm, a)"},
+        {"pushb", "VmExt.push(ref vm, b)"},
+        {"pushc", "VmExt.push(ref vm, c)"},
 
-        {"cpusha", "cpush(ref vm, ca)"},
-        {"cpushb", "cpush(ref vm, cb)"},
-        {"cpushc", "cpush(ref vm, cc)"},
+        {"cpusha", "VmExt.cpush(ref vm, ca)"},
+        {"cpushb", "VmExt.cpush(ref vm, cb)"},
+        {"cpushc", "VmExt.cpush(ref vm, cc)"},
     };
 }

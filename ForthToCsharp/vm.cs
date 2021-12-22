@@ -74,12 +74,12 @@ public static partial class VmExt {
 
     // Parameter Stack manipulation implementation routines. Not checking array boundaries as .net does it for me.
     [RE] public static void depth(ref Vm vm) => push(ref vm, vm.top);
-    [RE] private static void push(ref Vm vm, nint c) => vm.ps[vm.top++] = c;
-    [RE] private static nint pop(ref Vm vm) => vm.ps[--vm.top];
-    [RE] private static int popi(ref Vm vm) => (int)vm.ps[--vm.top];
-    [RE] private static void cpush(ref Vm vm, char c) => vm.ps[vm.top++] = (nint)c;
-    [RE] private static char cpop(ref Vm vm) => (char)vm.ps[--vm.top];
-    [RE] private static (nint, nint) pop2(ref Vm vm) => (vm.ps[--vm.top], vm.ps[--vm.top]);
+    [RE] public static void push(ref Vm vm, nint c) => vm.ps[vm.top++] = c;
+    [RE] public static nint pop(ref Vm vm) => vm.ps[--vm.top];
+    [RE] public static int popi(ref Vm vm) => (int)vm.ps[--vm.top];
+    [RE] public static void cpush(ref Vm vm, char c) => vm.ps[vm.top++] = (nint)c;
+    [RE] public static char cpop(ref Vm vm) => (char)vm.ps[--vm.top];
+    [RE] public static (nint, nint) pop2(ref Vm vm) => (vm.ps[--vm.top], vm.ps[--vm.top]);
 
     // Private stack manipulation routines.
     [RE] public static void cells(ref Vm vm) => push(ref vm, vm.CELL_SIZE);
