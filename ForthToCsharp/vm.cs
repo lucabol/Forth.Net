@@ -43,17 +43,12 @@ public struct Vm
     public TextWriter output;
     public TextReader input;
     public int source;
+    public int word;
 
     public int inp = 0;
     public int source_max_chars;
     public int word_max_chars;
     public int input_len_chars = 0;
-
-    // Word buffer management.
-    public int word;
-
-    // Last defined word;
-    public string lastWord = "";
 
     // state: compiling -> true, interpreting -> false.
     public int state = 0;
@@ -262,8 +257,10 @@ public static partial class VmExt
         return s.ToString();
     }
     [RE]public static void _labelHere(ref Vm vm, string s) {
-        vm.lastWord = s;
         vm.words[s] = vm.here_p;
+    }
+    [RE]public static void _pushLabel(ref Vm vm, string s) {
+        push(ref vm, vm.words[s]);
     }
 
     [RE]public static void _do(ref Vm vm, string word) {

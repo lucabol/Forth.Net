@@ -7,26 +7,33 @@ using System.Linq;
 public delegate void Definition(Word w, Translator tr);
 
 public struct Word {
-    public string     lastWordName;
     public Definition def;
     public bool       immediate;
     public bool       export;
 }
 
 public class Translator {
+    // CSharp output formatting
+    const int startCodeColumn = 8;
+    const int startDefColumn  = 12;
+
     // Input and outputs.
-    public StringBuilder interpr;
-    public StringBuilder compile;
+    public StringBuilder output;
     public TextReader inputReader;
+
     public Queue<string> inputWords = new();
-    public string lastWord = "";
 
-    // State of the interpret.
-    public bool Interpreting = true;
+    // Manage definition words.
+    public bool InDefinition  = false;
+    public string lastWord    = "";
+    public string lastCreated = "";
 
-    public Translator(TextReader inputReader, StringBuilder interpr, StringBuilder compile) {
-        this.interpr = interpr;
-        this.compile = compile;
+    List<Word>? defActions;
+    List<Word>? doesActions;
+    List<Word>? actions;
+
+    public Translator(TextReader inputReader, StringBuilder output) {
+        this.output  = output;
         this.inputReader = inputReader;
     }
 
@@ -43,21 +50,67 @@ public class Translator {
         return inputWords.Dequeue();
     }
 
-    public static void CreateDef(Word w, Translator tr) {
-        // TODO: this is very akward (wrong?). My brain hurts.
-        if(tr.Interpreting) {
-            var s = tr.NextWord();
-            if(s == null) throw new Exception("End of input stream after defining word");
-            tr.lastWord = s;
-            tr.interpr.AppendLine(ToCsharpInst("_labelHere", $"\"{s}\""));
-        } else {
-            var label = ToCsharpInst("_labelHere", "s");
-            tr.compile.AppendLine($"{{;bl;word;count;sstring;{label};}}");
-        }
+    public void Emit(string s) => output.AppendLine(s);
+
+    public static void Execute(Word w, Translator tr) => w.def(w, tr);
+    public static void Compile(Word w, Translator tr) {
+        if(w.immediate)
+            w.def(w, tr);
+        else if(tr.actions == null)
+            throw new Exception($"Trying to compile {w} outside a definition");
+        else
+            tr.actions.Add(w);
     }
+    public static void Perform(Word w, Translator tr) {
+        if(tr.InDefinition) Compile(w, tr);
+        else Execute(w, tr);
+    }
+
     public static void ColonDef(Word w, Translator tr) {
-        tr.Interpreting = false;
-        CreateDef(w, tr);
+        var s = tr.NextWord();
+        if(s == null) throw new Exception("End of input stream after Colon");
+
+        tr.lastWord    = s;
+        tr.defActions  = new();
+        tr.doesActions = null;
+        tr.actions     = tr.defActions;
+
+        tr.Emit(ToCsharpInst("_labelHere", $"\"{s}\""));
+
+        tr.InDefinition = true;
+    }
+    public static void CreateDef(Word w, Translator tr) {
+        var s = tr.NextWord();
+        if(s == null) throw new Exception("End of input stream after Create");
+
+        tr.lastCreated = s;
+        tr.Emit(ToCsharpInst("_labelHere", $"\"{s}\""));
+
+        // By default, calling a created word pushes the address on the stack.
+        // This behavior can be overridden by does>, which is managed below.
+        tr.words[ToCsharpId(s)] = inline(ToCsharpInst("_pushLabel", $"\"{s}\""));
+    }
+    public static void DoesDef(Word w, Translator tr) {
+        // Encountering does> finishes the definition of the word and starts the definition of does.
+        tr.doesActions = new();
+        tr.actions = tr.doesActions;
+        tr.doesActions.Add(
+                function((Word w, Translator tr1) => // tr1 is at time of does> execution.
+                    tr.Emit(ToCsharpInst("_pushLabel", $"\"{tr1.lastCreated}\"")), false));
+    }
+    public static void SemiColonDef(Word w, Translator tr) {
+        if(tr.defActions == null) throw new Exception("Semicolon (;) seen in interpret mode");
+
+         // Gnarly. At creation (i.e. 10 array ar) attach the words from does> part of : array to
+         // the dictionary word for ar.
+        if(tr.doesActions != null)
+            tr.defActions.Add(function((Word w, Translator tr1) =>
+                        tr.words[tr1.lastCreated] = function((Word w, Translator tr2) => 
+                                            ExecuteWords(tr.doesActions), false), false));
+
+        // Attach the definition actions to the defining word (: array)
+        tr.words[ToCsharpId(tr.lastWord)] = new Word { immediate = false, export = false, def = ExecuteWords(tr.defActions)};
+        tr.InDefinition = false;
     }
     public static bool IsIdentifier(string text)
     {
@@ -90,41 +143,53 @@ public class Translator {
             else sb.Append(c);
         return sb.ToString();
     }
+
+    public static Definition ExecuteWords(IEnumerable<Word> words) =>
+        (Word w, Translator tr) => { foreach(var word in words) word.def(w, tr); };
+
     public static Word inline(string instructions) => new Word {
-        lastWordName = "", immediate = false, export = false, def = (word, tr) => {
+        immediate = false, export = false, def = (word, tr) => {
             var fullInst = $"{{\n{ToInstStream(instructions)}\n}}";
-            if(tr.Interpreting) tr.interpr.AppendLine(fullInst);
-            else                tr.compile.AppendLine(fullInst);
+            tr.Emit(fullInst);
         }
     };
 
     public static Word intrinsic(string name) => new Word {
-        lastWordName = name, immediate = false, export = true, def = (word, tr) => {
+        immediate = false, export = true, def = (word, tr) => {
             var csharp = ToCsharpInst(name);
-            if(tr.Interpreting) tr.interpr.AppendLine(csharp);
-            else                tr.compile.AppendLine(csharp);
+            tr.Emit(csharp);
         }
     };
-    public static Word function(Definition f) => new Word {
-        lastWordName = "", immediate = false, export = true, def = f };
+    public static Word function(Definition f, bool immediate) => new Word {
+        immediate = immediate, export = true, def = f };
 
     public static void PushNumber(string n, Translator tr) {
         var s = $"VmExt.push(ref vm, {n});";
-        if(tr.Interpreting) tr.interpr.AppendLine(s); else tr.compile.AppendLine(s);
+        tr.Emit(s);
     }
+    public static void CompileNumber(string word, Translator tr) {
+        if(tr.actions == null) throw new Exception($"Compiling {word}, found null actions property");
 
+        tr.actions.Add(new Word { immediate = false, export = false, def = (Word w, Translator tr) =>
+                PushNumber(word, tr) });
+    }
+    public static void PerformNumber(string aNumber, Translator tr) {
+        if(tr.InDefinition) CompileNumber(aNumber, tr);
+        else PushNumber(aNumber, tr);
+    }
     public static void TranslateWord(string word, Translator tr) {
-        if(tr.words.TryGetValue(word, out var v)) {
-            v.def(v, tr);
+        if(tr.words.TryGetValue(word, out var v)) { // Keep symbols (i.e, +, -).
+            Perform(v, tr);
+        } else if(tr.words.TryGetValue(ToCsharpId(word), out var vc)) { // Transform symbols to C#.
+            Perform(vc, tr);
         } else if(nint.TryParse(word, out var _)) {
-            PushNumber(word, tr);
-        } else { // Might be a defined word.
-            InsertDo(word, tr);
+            PerformNumber(word, tr);
+        } else {
+            throw new Exception($"Word '{word}' not in the dictionary.");
         }
     }
     public static void InsertDo(string word, Translator tr) {
-        var wr = tr.Interpreting ? tr.interpr : tr.compile;
-        wr.AppendLine(ToCsharpInst("_do", $"\"{word}\""));
+        tr.Emit(ToCsharpInst("_do", $"\"{word}\""));
     }
 
     public static void Translate(Translator tr) {
@@ -135,31 +200,29 @@ public class Translator {
             TranslateWord(word, tr);
         }
     }
-    public static (string,string) TranslateString(string forthCode) {
-        var isb = new StringBuilder();
-        var csb = new StringBuilder();
-        var tr = new Translator(new StringReader(forthCode), isb, csb);
+    public static string TranslateString(string forthCode) {
+        var outp = new StringBuilder();
+        var tr = new Translator(new StringReader(forthCode), outp);
         Translate(tr);
-        return (tr.interpr.ToString(), tr.compile.ToString());
+        return tr.output.ToString();
     }
 
-    public static string ToCSharp(string funcName, string interpret, string compile) =>
+    public static string ToCSharp(string funcName, string outp) =>
         $@"
-        static public partial class __GEN {{
-            static public long Test{funcName}() {{
-                var vm = new Vm(System.Console.In, System.Console.Out);
-                {funcName}(ref vm);
-                var res = VmExt.pop(ref vm);
-                VmExt.depth(ref vm);
-                var zero = VmExt.pop(ref vm);
-                return res + zero;
-            }}
-            {compile}
-            static public void {funcName} (ref Vm vm) {{
-                {interpret}
-            }}
-        }}
-        ";
+static public partial class __GEN {{
+    static public long Test{funcName}() {{
+        var vm = new Vm(System.Console.In, System.Console.Out);
+        {funcName}(ref vm);
+        var res = VmExt.pop(ref vm);
+        VmExt.depth(ref vm);
+        var zero = VmExt.pop(ref vm);
+        return res + zero;
+    }}
+    static public void {funcName} (ref Vm vm) {{
+        {outp}
+    }}
+}}
+";
 
     // The Forth dictionary.
     public Dictionary<string, Word> words = new() {
@@ -190,13 +253,27 @@ public class Translator {
 
             {"_labelHere"      ,  intrinsic("_labelHere")},
 
-            {"create"  ,  function(CreateDef)},
+            {"create"  ,  function(CreateDef, false)},
+            {":"  ,       function(ColonDef, false)},
+            {";"  ,       function(SemiColonDef, true)},
+            {"does>"  ,   function(DoesDef, true)},
         };
 
     // Maps symbols to words
     public static Dictionary<char, string> sym = new() {
         {'+', "plus"},
-        {'-', "minus"}
+        {'-', "minus"},
+        {'>', "more"},
+        {'<', "less"},
+        {'=', "equal"},
+        {'!', "store"},
+        {'@', "fetch"},
+        {'"', "apostr"},
+        {'%', "percent"},
+        {'$', "dollar"},
+        {'*', "mult"},
+        {'(', "oparens"},
+        {')', "cparens"},
     };
 
     public static Dictionary<string, string> specialInsts = new() {
