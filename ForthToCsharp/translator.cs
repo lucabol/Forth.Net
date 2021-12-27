@@ -50,6 +50,16 @@ public class Translator {
         return inputWords.Dequeue();
     }
 
+    public static void CommentP(Word w, Translator tr) {
+        string? word;
+        do {
+            word = tr.NextWord();
+        } while(word != null && word != ")");
+    }
+    public static void CommentS(Word w, Translator tr) {
+        tr.inputWords.Clear(); // Remove all words read on the current line.
+    }
+
     public void Emit(string s) => output.AppendLine(s);
 
     public static void Execute(Word w, Translator tr) => w.def(w, tr);
@@ -223,17 +233,61 @@ static public partial class __GEN {{
     }}
 }}
 ";
+    public static Word binary(string op) => inline($"popa;popb;var c = b {op} a;pushc;");
+    public static Word intbinary(string op) => inline($"popa;popb;var c = (int)b {op} (int)a;pushc;");
+    public static Word unary(string op)  => inline($"popa;var c = {op}(a);pushc;");
+    public static Word unaryp(string op)  => inline($"popa;var c = (a){op};pushc;");
+    public static Word math2(string op)  => inline($"popa;popb;var c = Math.{op}(b, a);pushc;");
+    public static Word comp(string op) => inline($"popa;popb;var f = b {op} a;var c = f ? -1 : 0;pushc;");
+    public static Word compu(string op) => inline($"popa;var f = a {op};var c = f ? -1 : 0;pushc;");
+    public static Word pusha(string op) => inline($"var a = {op};pusha;");
 
     // The Forth dictionary.
-    public Dictionary<string, Word> words = new() {
-            {"+"       ,  inline("popa;popb;var c = a + b;pushc;") },
+    public Dictionary<string , Word> words = new() {
+            {"+"             , binary("+") }         ,
+            {"-"             , binary("-") }         ,
+            {"*"             , binary("*") }         ,
+            {"/"             , binary("/") }         ,
+            {"mod"           , binary("%") }         ,
+            {"and"           , binary("&") }         ,
+            {"or"            , binary("|") }         ,
+            {"xor"           , binary("^") }         ,
+            {"lshift"        , intbinary("<<") }        ,
+            {"rshift"        , intbinary(">>") }        ,
+            {"negate"        , unary("-") }          ,
+            {"1+"            , unary("++") }         ,
+            {"1-"            , unary("--") }         ,
+            {"2*"            , unary("2 *") }         ,
+            {"2/"            , unary("2 /") }         ,
+            {"abs"           , unary("Math.Abs") }   ,
+            {"min"           , math2("Min") }        ,
+            {"max"           , math2("Max") }        ,
+            {"="           , comp("==") }        ,
+            {"<>"           , comp("!=") }        ,
+            {"<"           , comp("<") }        ,
+            {"<="           , comp("<=") }        ,
+            {">"           , comp(">") }        ,
+            {">="           , comp(">=") }        ,
+            {"0="           , compu("== 0") }        ,
+            {"0<>"           , compu("!= 0") }        ,
+            {"0<"           , compu("< 0") }        ,
+            {"0<="           , compu("<= 0") }        ,
+            {"0>"           , compu("> 0") }        ,
+            {"0>="           , compu(">= 0") }        ,
+            {"true"           , pusha("-1") }        ,
+            {"false"           , pusha("0") }        ,
 
             {"dup"     ,  intrinsic("dup")},
             {"dup2"    ,  intrinsic("dup2")},
             {"drop"    ,  intrinsic("drop")},
             {"drop2"   ,  intrinsic("drop2")},
             {"cells"   ,  intrinsic("cells")},
+            {"cell+"   ,  intrinsic("cellp")},
+            {"chars"   ,  intrinsic("chars")},
+            {"char+"   ,  intrinsic("charp")},
+            {"unused"    ,  intrinsic("unused")},
             {"here"    ,  intrinsic("here")},
+            {"over"    ,  intrinsic("over")},
             {"@"       ,  intrinsic("_fetch")},
             {"c@"      ,  intrinsic("_cfetch")},
             {"!"       ,  intrinsic("_store")},
@@ -250,13 +304,34 @@ static public partial class __GEN {{
             {"word"    ,  intrinsic("word")},
             {"bl"      ,  intrinsic("bl")},
             {"_do"     ,  intrinsic("_do")},
+            {".s"   ,  intrinsic("_dots")},
+            {"dump"    ,  intrinsic("dump")},
+            {"?dup"    ,  intrinsic("_qdup")},
+            {"depth"    ,  intrinsic("depth")},
+            {">r"    ,  intrinsic("toR")},
+            {"r>"    ,  intrinsic("fromR")},
+            {"r@"    ,  intrinsic("fetchR")},
+            {"+!"    ,  intrinsic("_fetchP")},
+            {"move"    ,  intrinsic("move")},
+            {"cmove"    ,  intrinsic("cmove")},
+            {"cmove>"    ,  intrinsic("cmove")},
+            {"fill"    ,  intrinsic("fill")},
+            {"blank"    ,  intrinsic("blank")},
+            {"erase"    ,  intrinsic("erase")},
 
             {"_labelHere"      ,  intrinsic("_labelHere")},
 
-            {"create"  ,  function(CreateDef, false)},
-            {":"  ,       function(ColonDef, false)},
-            {";"  ,       function(SemiColonDef, true)},
-            {"does>"  ,   function(DoesDef, true)},
+            {"create" , function(CreateDef    , false)} ,
+            {":"      , function(ColonDef     , false)} ,
+            {";"      , function(SemiColonDef , true)}  ,
+            {"does>"  , function(DoesDef      , true)}  ,
+            {"("  , function(CommentP      , true)}  ,
+            {"\\"  , function(CommentS      , true)}  ,
+
+            {"."       ,   inline(";popa;vm.output.WriteLine(a);")},
+            {"cr"      ,   inline("vm.output.WriteLine();")},
+            {"swap"      ,   inline("popa;popb;pusha;pushb;")},
+            {"rot"      ,   inline("popa;popb;popc;pushb;pusha;pushc;")},
         };
 
     // Maps symbols to words

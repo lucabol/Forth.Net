@@ -12,7 +12,7 @@ try {
     var vm      = File.ReadAllText("../ForthToCsharp/vm.cs");
     var vmnew   = "var vm = new Vm(System.Console.In, System.Console.Out);";
 
-    WriteLine("Please wait. Interpreting initial script ...");
+    WriteLine("Initializing. Please wait ...");
     var script = await CSharpScript.RunAsync(vm).ConfigureAwait(false);
     script     = await script.ContinueWithAsync(vmnew).ConfigureAwait(false);
     WriteLine("Done. Say 'bye' to exit.");
@@ -49,7 +49,7 @@ try {
 
             script = await script.ContinueWithAsync(newCode).ConfigureAwait(false);
 
-            if(!debug) SetCursorPosition(line.Length + 2, BufferHeight - 2);
+            if(!debug) SetCursorPosition(line.Length + 5, BufferHeight - 2);
             ColorLine(ConsoleColor.DarkGreen, "ok");
 
         } catch(Exception e) {

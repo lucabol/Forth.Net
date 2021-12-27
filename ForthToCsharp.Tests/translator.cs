@@ -44,6 +44,7 @@ public class TranslatorTests
     [InlineData(": my+ 1 + ; \n 20 my+", 21)]
     [InlineData(": uarray create allot ;\n80 uarray ar\n 100 10 ar + ! 10 ar + @", 100)]
     [InlineData(": uarray create allot does> + ;\n80 uarray ar\n 1000 10 ar ! 10 ar @", 1000)]
+    [InlineData("1 ( afafdaf ) 1 + \n 2 + \\ fadfafdaf", 4)]
     async public void Run(string forth, long result) {
         var s = Translator.TranslateString(forth);
         var csharp = Translator.ToCSharp("Run", s);

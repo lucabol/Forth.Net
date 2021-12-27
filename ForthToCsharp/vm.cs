@@ -24,11 +24,13 @@ public struct Vm
     public const int CHAR_SIZE = sizeof(char);
     public readonly int CELL_SIZE = IntPtr.Size;
 
-    // ps is the parameter stack, ds is the data space.
+    // ps is the parameter stack, ds is the data space, rs is the return stack.
     public int top = 0;
     public int here_p = 0;
+    public int rtop = 0;
     public nint[] ps;
     public byte[] ds;
+    public nint[] rs;
 
     // Defined words need to store their doer behvior as their name might change at runtime.
     public Dictionary<string, Doer> doers = new();
@@ -57,12 +59,14 @@ public struct Vm
               TextWriter output,
               int ps_max_cells = 64,
               int ds_max_bytes = 64 * 1_024,
+              int rs_max_cells = 64,
               int source_max_chars = 1_024,
               int word_max_chars = 31)
     {
 
         ps = new nint[ps_max_cells * CELL_SIZE];
         ds = new byte[ds_max_bytes];
+        rs = new nint[rs_max_cells * CELL_SIZE];
 
         this.input = input;
         this.output = output;
@@ -89,14 +93,30 @@ public static partial class VmExt
     [RE] public static char cpop(ref Vm vm) => (char)vm.ps[--vm.top];
     [RE] public static (nint, nint) pop2(ref Vm vm) => (vm.ps[--vm.top], vm.ps[--vm.top]);
 
-    // Private stack manipulation routines.
-    [RE] public static void cells(ref Vm vm) => push(ref vm, vm.CELL_SIZE);
-    [RE] public static void drop(ref Vm vm) => pop(ref vm);
-    [RE] public static void drop2(ref Vm vm) { pop(ref vm); pop(ref vm); }
-    [RE] public static void dup(ref Vm vm) { var x = pop(ref vm); push(ref vm, x); push(ref vm, x); }
-    [RE] public static void dup2(ref Vm vm) { var (x, y) = (pop(ref vm), pop(ref vm)); push(ref vm, y); push(ref vm, x); push(ref vm, y); push(ref vm, x); }
+    [RE] public static void cells(ref Vm vm) => push(ref vm, pop(ref vm) * vm.CELL_SIZE);
+    [RE] public static void chars(ref Vm vm) => push(ref vm, pop(ref vm) * Vm.CHAR_SIZE);
+    [RE] public static void charp(ref Vm vm) => push(ref vm, popi(ref vm) + Vm.CHAR_SIZE);
+    [RE] public static void cellp(ref Vm vm) => push(ref vm, popi(ref vm) + vm.CELL_SIZE);
+    [RE] public static void drop(ref Vm vm) => vm.top--;
+    [RE] public static void drop2(ref Vm vm) => vm.top -= 2;
+    [RE] public static void dup(ref Vm vm) => push(ref vm, vm.ps[vm.top - 1]);
+    [RE] public static void dup2(ref Vm vm) { push(ref vm, vm.ps[vm.top - 2]); push(ref vm, vm.ps[vm.top - 2]);}
+    [RE] public static void over(ref Vm vm) => push(ref vm, vm.ps[vm.top - 2]);
+    [RE] public static void _qdup(ref Vm vm) {
+        var t = pop(ref vm);
+        if(t == Vm.FALSE) push(ref vm, Vm.FALSE);
+        else { push(ref vm, t); push(ref vm, t);}
+    }
+
+    // Return stack manipulation.
+    [RE] public static void rpush(ref Vm vm, nint c) => vm.rs[vm.rtop++] = c;
+    [RE] public static nint rpop(ref Vm vm) => vm.rs[--vm.rtop];
+    [RE] public static void toR(ref Vm vm) => rpush(ref vm, pop(ref vm));
+    [RE] public static void fromR(ref Vm vm) => push(ref vm, rpop(ref vm));
+    [RE] public static void fetchR(ref Vm vm) => push(ref vm, vm.rs[vm.rtop - 1]);
 
     // Data Space manipulation routines.
+    [RE] public static void unused(ref Vm vm) => push(ref vm, vm.ds.Length - vm.here_p);
     [RE] public static void here(ref Vm vm) => push(ref vm, vm.here_p);
     [RE]
     public static void _fetch(ref Vm vm)
@@ -119,6 +139,7 @@ public static partial class VmExt
     {
         here(ref vm);
         _store(ref vm);
+        vm.here_p += vm.CELL_SIZE;
     }
     [RE]
     public static void _cstore(ref Vm vm)
@@ -133,6 +154,7 @@ public static partial class VmExt
     {
         here(ref vm);
         _cstore(ref vm);
+        vm.here_p += Vm.CHAR_SIZE;
     }
     [RE]
     public static void _cfetch(ref Vm vm)
@@ -141,6 +163,19 @@ public static partial class VmExt
         var s = new Span<byte>(vm.ds, c, Vm.CHAR_SIZE);
         var value = MemoryMarshal.Read<char>(s);
         push(ref vm, (nint)value);
+    }
+    [RE]
+    public static void _fetchP(ref Vm vm)
+    {
+        var a = popi(ref vm);
+        var n = pop(ref vm);
+
+        var s = new Span<byte>(vm.ds, a, vm.CELL_SIZE);
+        var value = MemoryMarshal.Read<nint>(s);
+
+        push(ref vm, value + n);
+        push(ref vm, a);
+        _cstore(ref vm);
     }
     [RE]
     public static void allot(ref Vm vm)
@@ -152,6 +187,37 @@ public static partial class VmExt
     [RE] public static void align(ref Vm vm) => vm.here_p = _align(vm.here_p, vm.CELL_SIZE);
     [RE] public static void aligned(ref Vm vm) { var n = popi(ref vm); push(ref vm, _align(n, vm.CELL_SIZE)); }
 
+    // Memory manipulation.
+    [RE] public static void move(ref Vm vm) {
+        var c = popi(ref vm);
+        var t = popi(ref vm);
+        var f = popi(ref vm);
+        Array.Copy(vm.ds, f, vm.ds, t, c);
+    }
+    [RE] public static void erase(ref Vm vm) {
+        var c = popi(ref vm);
+        var f = popi(ref vm);
+        Array.Fill<byte>(vm.ds, 0, f, c);
+    }
+    [RE] public static void fill(ref Vm vm) {
+        var v = (char)popi(ref vm);
+        var c = popi(ref vm);
+        var f = popi(ref vm);
+        var s = MemoryMarshal.Cast<byte, char>(new Span<byte>(vm.ds, f, c * Vm.CHAR_SIZE));
+        s.Fill(v);
+    }
+    [RE] public static void cmove(ref Vm vm) {
+        var c = popi(ref vm);
+        var t = popi(ref vm);
+        var f = popi(ref vm);
+        var s = MemoryMarshal.Cast<byte, char>(new Span<byte>(vm.ds, f, c * Vm.CHAR_SIZE));
+        var k = MemoryMarshal.Cast<byte, char>(new Span<byte>(vm.ds, t, c * Vm.CHAR_SIZE));
+        s.CopyTo(k);
+    }
+    [RE] public static void blank(ref Vm vm) {
+        push(ref vm, (nint)' ');
+        fill(ref vm);
+    }
     // Input/Word manipulation routines.
 
     /** Input/output area management **/
@@ -267,5 +333,20 @@ public static partial class VmExt
         if(vm.doers.TryGetValue(word, out var f)) f(ref vm);
         else if(vm.words.TryGetValue(word, out var a)) push(ref vm, a);
         else throw new Exception($"{word} is not a word in the dictionary");
+    }
+    [RE] public static void _dots(ref Vm vm) {
+        vm.output.Write($"<{vm.top}> ");
+        for(int i = 0; i < vm.top; i++) vm.output.Write($" {vm.ps[i]}");
+        vm.output.WriteLine();
+        vm.output.WriteLine();
+    }
+    [RE] public static void dump(ref Vm vm) {
+        var n = popi(ref vm);
+        var s = popi(ref vm);
+        for(var i = 0; i < n; i++) {
+            byte v = vm.ds[s + i];
+            vm.output.Write($"{v:d},{v:x} ");
+        }
+        vm.output.WriteLine();
     }
 }
