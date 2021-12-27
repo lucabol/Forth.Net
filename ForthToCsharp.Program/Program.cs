@@ -14,16 +14,19 @@ try {
     var newCode = "";
     var line = "";
     var debug = false;
+    ConsoleColor color;
 
     var input   = new StringBuilder();
     var output  = new StringBuilder();
     var tr      = new Translator(Console.In, output);
 
+    System.ReadLine.HistoryEnabled = true;
+
     while(true) {
 
         tr.output.Clear();
 
-        line = ReadLine();
+        line = System.ReadLine.Read("");
         if(line == null) break;
         line = line.Trim().ToLowerInvariant();
 
@@ -36,11 +39,16 @@ try {
         Translator.Translate(tr);
         newCode = tr.output.ToString();
 
-        if(debug) WriteLine(newCode);
+        if(debug) WriteLine($"\n{newCode}");
 
         script = await script.ContinueWithAsync(newCode).ConfigureAwait(false);
-        SetCursorPosition(line.Length + 2, BufferHeight - 2);
+
+        if(!debug) SetCursorPosition(line.Length + 2, BufferHeight - 2);
+
+        color = ForegroundColor;
+        ForegroundColor = ConsoleColor.DarkGreen;
         WriteLine("ok");
+        ForegroundColor = color;
     }
 } catch(Exception e) {
     WriteLine(e);
