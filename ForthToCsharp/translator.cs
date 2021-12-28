@@ -135,9 +135,17 @@ public class Translator {
     public static void dotString(Word w, Translator tr) {
         var s = tr.NextWord('"');
         if(s == null) throw new Exception("End of input stream after .\"");
-        s = s.TrimStart();
 
         Compile(function((Word w, Translator tr1) => tr1.Emit($"Console.Write(\"{s}\");"), false), tr);
+    }
+    public static void abort(Word w, Translator tr) {
+        var s = tr.NextWord('"');
+        if(s == null) throw new Exception("End of input stream after abort\"");
+
+        void f(Word w, Translator tr1) {
+            tr1.Emit($"if(VmExt.pop(ref vm) != 0) throw new Exception(\"{s}\");");
+        }
+        Compile(function(f, false), tr);
     }
     public static void charIm(Word w, Translator tr) {
         var s = tr.NextWord();
@@ -383,6 +391,7 @@ static public partial class __GEN {{
             {"j"  , function(JDef      , false)}  ,
             {".\""  , function(dotString      , true)}  ,
             {"[char]"  , function(charIm      , true)}  ,
+            {"abort\""  , function(abort      , true)}  ,
 
             {"."       ,   inline("popa;vm.output.Write(a);vm.output.Write(' ');")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
