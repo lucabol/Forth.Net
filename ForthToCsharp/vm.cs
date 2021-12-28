@@ -79,6 +79,10 @@ public struct Vm
         this.source_max_chars = source_max_chars;
         this.word_max_chars = word_max_chars;
     }
+    public void reset() {
+        // Don't restart the ds. Is that right?
+        top = 0; rtop = 0; state = 0;
+    }
 }
 
 public static partial class VmExt

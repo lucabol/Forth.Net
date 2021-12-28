@@ -9,17 +9,19 @@ try {
         ResetColor();
     };
 
-    var vm      = File.ReadAllText("../ForthToCsharp/vm.cs");
+    var vmCode  = File.ReadAllText("../ForthToCsharp/vm.cs");
     var vmnew   = "var vm = new Vm(System.Console.In, System.Console.Out);";
 
-    WriteLine("Initializing. Please wait ...");
-    var script = await CSharpScript.RunAsync(vm).ConfigureAwait(false);
+    Write("Initializing. Please wait ...");
+    var script = await CSharpScript.RunAsync(vmCode).ConfigureAwait(false);
     script     = await script.ContinueWithAsync(vmnew).ConfigureAwait(false);
-    WriteLine("Done. Say 'bye' to exit.");
+    WriteLine(" done.");
+    WriteLine("Say 'bye' to exit. No output means all good.");
 
-    var newCode = "";
-    var line    = "";
-    var debug   = false;
+    var newCode   = "";
+    var line      = "";
+    var lowerLine = "";
+    var debug     = false;
 
     var input   = new StringBuilder();
     var output  = new StringBuilder();
@@ -34,10 +36,10 @@ try {
 
             line = System.ReadLine.Read("");
             if(line == null) break;
-            line = line.Trim().ToLowerInvariant();
+            lowerLine = line.Trim().ToLowerInvariant();
 
-            if(line == "bye") break;
-            if(line == "debug") { debug = !debug; continue;}
+            if(lowerLine == "bye") break;
+            if(lowerLine == "debug") { debug = !debug; continue;}
 
             using var reader = new StringReader(line); // TODO: Refactor Translator API to stateless funcs.
             tr.inputReader   = reader;
@@ -48,12 +50,9 @@ try {
             if(debug) WriteLine($"\n{newCode}");
 
             script = await script.ContinueWithAsync(newCode).ConfigureAwait(false);
-
-            if(!debug) SetCursorPosition(line.Length + 5, BufferHeight - 2);
-            ColorLine(ConsoleColor.DarkGreen, "ok");
-
         } catch(Exception e) {
             ColorLine(ConsoleColor.Red, e.ToString());
+            script = await script.ContinueWithAsync("vm.reset()").ConfigureAwait(false);
         }
     }
 } finally {

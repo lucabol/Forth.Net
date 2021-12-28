@@ -13,15 +13,12 @@ public struct Word {
 }
 
 public class Translator {
-    // CSharp output formatting
-    const int startCodeColumn = 8;
-    const int startDefColumn  = 12;
 
     // Input and outputs.
     public StringBuilder output;
     public TextReader inputReader;
 
-    public Queue<string> inputWords = new();
+    public string? line;
 
     // Manage definition words.
     public bool InDefinition  = false;
@@ -32,22 +29,33 @@ public class Translator {
     List<Word>? doesActions;
     List<Word>? actions;
 
+    // Iteration count for for loops.
+    public int nested = 0;
+
     public Translator(TextReader inputReader, StringBuilder output) {
         this.output  = output;
         this.inputReader = inputReader;
     }
 
     // I can't use an iterator returning method because CreateWord need access to the next word.
-    public string? NextWord() {
-        while(inputWords.Count == 0) {
-            var line = inputReader.ReadLine();
+    public string? NextWord(char sep = ' ') {
+        while(string.IsNullOrWhiteSpace(line)) {
+            line = inputReader.ReadLine();
             if(line == null) return null;
-
-            // The strange empty array is an optimized way to split on system specific whitespace.
-            var ss = line.Split(new char[0], StringSplitOptions.RemoveEmptyEntries);
-            foreach(var s in ss) inputWords.Enqueue(s);
         }
-        return inputWords.Dequeue();
+
+        string word;
+        line = line.Trim();
+        var index = line.IndexOf(sep);
+        if(index == -1) {
+            word = line;
+            line = null;
+            return word;
+        }
+
+        word = line.Substring(0, index);
+        line = line.Substring(index + 1);
+        return word;
     }
 
     public static void CommentP(Word w, Translator tr) {
@@ -57,7 +65,7 @@ public class Translator {
         } while(word != null && word != ")");
     }
     public static void CommentS(Word w, Translator tr) {
-        tr.inputWords.Clear(); // Remove all words read on the current line.
+        tr.line = "";
     }
 
     public void Emit(string s) => output.AppendLine(s);
@@ -79,6 +87,7 @@ public class Translator {
     public static void ColonDef(Word w, Translator tr) {
         var s = tr.NextWord();
         if(s == null) throw new Exception("End of input stream after Colon");
+        s = s.ToLowerInvariant();
 
         tr.lastWord    = s;
         tr.defActions  = new();
@@ -92,6 +101,7 @@ public class Translator {
     public static void CreateDef(Word w, Translator tr) {
         var s = tr.NextWord();
         if(s == null) throw new Exception("End of input stream after Create");
+        s = s.ToLowerInvariant();
 
         tr.lastCreated = s;
         tr.Emit(ToCsharpInst("_labelHere", $"\"{s}\""));
@@ -121,6 +131,36 @@ public class Translator {
         // Attach the definition actions to the defining word (: array)
         tr.words[ToCsharpId(tr.lastWord)] = new Word { immediate = false, export = false, def = ExecuteWords(tr.defActions)};
         tr.InDefinition = false;
+    }
+    public static void dotString(Word w, Translator tr) {
+        var s = tr.NextWord('"');
+        if(s == null) throw new Exception("End of input stream after .\"");
+        s = s.TrimStart();
+
+        tr.Emit($"Console.Write(\"{s}\");");
+    }
+    public static void DoDef(Word w, Translator tr) {
+
+        tr.nested++;
+
+        var i = $"___i{tr.nested}";
+        var s = $"___s{tr.nested}";
+        var e = $"___e{tr.nested}";
+        tr.Emit($@"var {s} = VmExt.pop(ref vm);
+var {e} = VmExt.pop(ref vm);
+for(var {i} = {s};{i} < {e}; {i}++) {{
+");
+    }
+
+    public static void IDef(Word w, Translator tr) {
+        
+        var i = $"___i{tr.nested}";
+        tr.Emit($"VmExt.push(ref vm, {i});");
+    }
+    public static void JDef(Word w, Translator tr) {
+        
+        var i = $"___i{tr.nested - 1}";
+        tr.Emit($"VmExt.push(ref vm, {i});");
     }
     public static bool IsIdentifier(string text)
     {
@@ -163,7 +203,11 @@ public class Translator {
             tr.Emit(fullInst);
         }
     };
-
+    public static Word verbatim(string text) => new Word {
+        immediate = false, export = false, def = (word, tr) => {
+            tr.Emit(text);
+        }
+    };
     public static Word intrinsic(string name) => new Word {
         immediate = false, export = true, def = (word, tr) => {
             var csharp = ToCsharpInst(name);
@@ -188,6 +232,7 @@ public class Translator {
         else PushNumber(aNumber, tr);
     }
     public static void TranslateWord(string word, Translator tr) {
+        word = word.ToLowerInvariant();
         if(tr.words.TryGetValue(word, out var v)) { // Keep symbols (i.e, +, -).
             Perform(v, tr);
         } else if(tr.words.TryGetValue(ToCsharpId(word), out var vc)) { // Transform symbols to C#.
@@ -327,11 +372,32 @@ static public partial class __GEN {{
             {"does>"  , function(DoesDef      , true)}  ,
             {"("  , function(CommentP      , true)}  ,
             {"\\"  , function(CommentS      , true)}  ,
+            {"do"  , function(DoDef      , false)}  ,
+            {"loop"  , verbatim("}")}  ,
+            {"i"  , function(IDef      , false)}  ,
+            {"j"  , function(JDef      , false)}  ,
+            {".\""  , function(dotString      , false)}  ,
 
-            {"."       ,   inline(";popa;vm.output.WriteLine(a);")},
+            {"."       ,   inline("popa;vm.output.Write(a);vm.output.Write(' ');")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
             {"swap"      ,   inline("popa;popb;pusha;pushb;")},
             {"rot"      ,   inline("popa;popb;popc;pushb;pusha;pushc;")},
+
+            {"if"      ,   verbatim("if(VmExt.pop(ref vm) != 0) {")},
+            {"else"      ,   verbatim("} else {")},
+            {"then"      ,   verbatim("}")},
+            {"endif"      ,   verbatim("}")},
+
+            {"begin"      ,   verbatim("while(true) {")},
+            {"repeat"      ,   verbatim("}")},
+            {"again"      ,   verbatim("}")},
+            {"while"      ,   verbatim("if(VmExt.pop(ref vm) == 0) break;")},
+            {"until"      ,   verbatim("if(VmExt.pop(ref vm) != 0) break; }")},
+            {"leave"      ,   verbatim("break;")},
+            {"page"      ,   verbatim("vm.output.Clear();")},
+            {"spaces"      ,   inline("popa;for(var i = 0; i < a; i++) vm.output.Write(' ');")},
+            {"space"      ,   inline("vm.output.Write(' ');")},
+            {"emit"      ,   inline("popa;vm.output.Write((char)a);")},
         };
 
     // Maps symbols to words
