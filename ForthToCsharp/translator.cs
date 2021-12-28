@@ -137,7 +137,12 @@ public class Translator {
         if(s == null) throw new Exception("End of input stream after .\"");
         s = s.TrimStart();
 
-        tr.Emit($"Console.Write(\"{s}\");");
+        Compile(function((Word w, Translator tr1) => tr1.Emit($"Console.Write(\"{s}\");"), false), tr);
+    }
+    public static void charIm(Word w, Translator tr) {
+        var s = tr.NextWord();
+        if(s == null) throw new Exception("End of input stream after [char]");
+        tr.Emit($"VmExt.push(ref vm, {(int)s[0]});");
     }
     public static void DoDef(Word w, Translator tr) {
 
@@ -376,7 +381,8 @@ static public partial class __GEN {{
             {"loop"  , verbatim("}")}  ,
             {"i"  , function(IDef      , false)}  ,
             {"j"  , function(JDef      , false)}  ,
-            {".\""  , function(dotString      , false)}  ,
+            {".\""  , function(dotString      , true)}  ,
+            {"[char]"  , function(charIm      , true)}  ,
 
             {"."       ,   inline("popa;vm.output.Write(a);vm.output.Write(' ');")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
