@@ -191,7 +191,7 @@ public class Translator {
         var s = tr.NextWord('"');
         if(s == null) throw new Exception("End of input stream after .\"");
 
-        Compile(function((Word w, Translator tr1) => tr1.Emit($"Console.Write(\"{s}\");"), false), tr);
+        Compile(function((Word w, Translator tr1) => tr1.Emit($"vm.output.WriteLine(\"{s}\");"), false), tr);
     }
     public static void abort(Word w, Translator tr) {
         var s = tr.NextWord('"');
@@ -493,6 +493,7 @@ static public partial class __GEN {{
             {"decimal"      ,   inline("var a = 10;pusha;basepu;_store;")},
             {"hex"      ,   inline("var a = 16;pusha;basepu;_store;")},
             {"?"      ,   inline("_fetch;_dot;")},
+            {"pad"      ,   inline("var a = vm.pad;pusha;")},
 
             {"if"      ,   verbatim("if(VmExt.pop(ref vm) != 0) {")},
             {"else"      ,   verbatim("} else {")},

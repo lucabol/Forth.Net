@@ -50,6 +50,9 @@ public struct Vm
     public int word_max_chars;
     public int input_len_chars = 0;
 
+    // pad buffer.
+    public int pad;
+
     // state: compiling -> true, interpreting -> false.
     public int state = 0;
 
@@ -59,11 +62,12 @@ public struct Vm
     public Vm(TextReader input,
               TextWriter output,
               int ps_max_cells = 64,
-              int ds_max_bytes = 64 * 1_024,
+              int ds_max_bytes = 64 * 16 * 1_024,
               int rs_max_cells = 64,
               int source_max_chars = 1_024,
               int word_max_chars = 31,
-              int xts_max = 64
+              int xts_max = 64,
+              int pad_max = 64
               )
     {
 
@@ -79,6 +83,9 @@ public struct Vm
         here_p += word_max_chars * CHAR_SIZE;
         source = here_p;
         here_p += source_max_chars * CHAR_SIZE;
+
+        pad = here_p;
+        here_p += pad_max;
 
         this.source_max_chars = source_max_chars;
         this.word_max_chars = word_max_chars;
