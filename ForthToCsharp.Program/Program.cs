@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 
 using static System.Console;
@@ -18,9 +19,6 @@ try {
     WriteLine(" done.");
     WriteLine("Say 'bye' to exit. No output means all good.");
 
-    var newCode   = "";
-    var line      = "";
-    var lowerLine = "";
     var debug     = false;
 
     var input   = new StringBuilder();
@@ -33,10 +31,11 @@ try {
 
         try {
             tr.output.Clear();
+            System.ReadLine.AutoCompletionHandler = new AutoCompletionHandler(tr);
 
-            line = System.ReadLine.Read("");
+            var line = System.ReadLine.Read("");
             if(line == null) break;
-            lowerLine = line.Trim().ToLowerInvariant();
+            var lowerLine = line.Trim().ToLowerInvariant();
 
             if(lowerLine == "bye") break;
             if(lowerLine == "debug") { debug = !debug; continue;}
@@ -45,13 +44,14 @@ try {
             tr.inputReader   = reader;
 
             Translator.Translate(tr);
-            newCode = tr.output.ToString();
+            var newCode = tr.output.ToString();
 
             if(debug) WriteLine($"\n{newCode}");
 
             script = await script.ContinueWithAsync(newCode).ConfigureAwait(false);
         } catch(Exception e) {
             ColorLine(ConsoleColor.Red, e.ToString());
+            tr.Reset();
             script = await script.ContinueWithAsync("vm.reset()").ConfigureAwait(false);
         }
     }
@@ -65,3 +65,21 @@ void ColorLine(ConsoleColor color, string s) {
     WriteLine(s);
     ForegroundColor = backupcolor;
 }
+
+class AutoCompletionHandler : IAutoCompleteHandler
+{
+    public char[] Separators { get; set; } = new char[] { ' ' };
+    public IEnumerable<string> words;
+
+    public string[] GetSuggestions(string text, int index)
+    {
+        if(string.IsNullOrWhiteSpace(text)) return words.ToArray();
+
+        return words.Where(s => s.StartsWith(text)).ToArray();
+    }
+
+    public AutoCompletionHandler(Translator tr) {
+        words = tr.words.Keys;
+    }
+}
+

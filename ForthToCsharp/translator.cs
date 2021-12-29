@@ -1,3 +1,4 @@
+#define NOBASEOFF
 using System;
 using System.IO;
 using System.Collections.Generic;
@@ -10,6 +11,8 @@ public struct Word {
     public Definition def;
     public bool       immediate;
     public bool       export;
+    public bool       tickdefined;
+    public string     name;
 }
 
 public class Translator {
@@ -31,6 +34,9 @@ public class Translator {
 
     // Iteration count for for loops.
     public int nested = 0;
+
+    // Create unique names for goto statements.
+    public int nameCount = 0;
 
     public Translator(TextReader inputReader, StringBuilder output) {
         this.output  = output;
@@ -58,6 +64,8 @@ public class Translator {
         return word;
     }
 
+    public void Reset() { line = null; InDefinition = false; nested = 0;}
+
     public static void CommentP(Word w, Translator tr) {
         string? word;
         do {
@@ -70,10 +78,13 @@ public class Translator {
 
     public void Emit(string s) => output.AppendLine(s);
 
-    public static void Execute(Word w, Translator tr) => w.def(w, tr);
+    private static void ExecuteDef(Word w, Translator tr) {
+        w.def(w, tr);
+        //if(!string.IsNullOrWhiteSpace(w.name)) tr.Emit($"{w.name}_end:\n");
+    }
     public static void Compile(Word w, Translator tr) {
         if(w.immediate)
-            w.def(w, tr);
+            ExecuteDef(w, tr);
         else if(tr.actions == null)
             throw new Exception($"Trying to compile {w} outside a definition");
         else
@@ -81,13 +92,19 @@ public class Translator {
     }
     public static void Perform(Word w, Translator tr) {
         if(tr.InDefinition) Compile(w, tr);
-        else Execute(w, tr);
+        else ExecuteDef(w, tr);
+    }
+
+    private static string NextWordNorm(Translator tr) {
+        var s = tr.NextWord();
+        if(s == null) throw new Exception($"End of input stream after {s}");
+        s = s.ToLowerInvariant();
+        s = ToCsharpId(s);
+        return s;
     }
 
     public static void ColonDef(Word w, Translator tr) {
-        var s = tr.NextWord();
-        if(s == null) throw new Exception("End of input stream after Colon");
-        s = s.ToLowerInvariant();
+        var s = NextWordNorm(tr);
 
         tr.lastWord    = s;
         tr.defActions  = new();
@@ -99,16 +116,14 @@ public class Translator {
         tr.InDefinition = true;
     }
     public static void CreateDef(Word w, Translator tr) {
-        var s = tr.NextWord();
-        if(s == null) throw new Exception("End of input stream after Create");
-        s = s.ToLowerInvariant();
+        var s = NextWordNorm(tr);
 
         tr.lastCreated = s;
         tr.Emit(ToCsharpInst("_labelHere", $"\"{s}\""));
 
         // By default, calling a created word pushes the address on the stack.
         // This behavior can be overridden by does>, which is managed below.
-        tr.words[ToCsharpId(s)] = inline(ToCsharpInst("_pushLabel", $"\"{s}\""));
+        tr.words[s] = inline(ToCsharpInst("_pushLabel", $"\"{s}\""));
     }
     public static void DoesDef(Word w, Translator tr) {
         // Encountering does> finishes the definition of the word and starts the definition of does.
@@ -128,9 +143,55 @@ public class Translator {
                         tr.words[tr1.lastCreated] = function((Word w, Translator tr2) => 
                                             ExecuteWords(tr.doesActions), false), false));
 
+        var wordName = ToCsharpId(tr.lastWord);
         // Attach the definition actions to the defining word (: array)
-        tr.words[ToCsharpId(tr.lastWord)] = new Word { immediate = false, export = false, def = ExecuteWords(tr.defActions)};
+        tr.words[wordName] = new Word { name = wordName, immediate = false,
+            export = false, def = ExecuteWords(tr.defActions)};
         tr.InDefinition = false;
+    }
+    // Try to use a c# constant instead of the dictionary for constants.
+    public static void ConstantDef(Word w, Translator tr) {
+        var s = NextWordNorm(tr);
+
+        tr.Emit($"readonly nint {s} = VmExt.pop(ref vm);");
+        tr.words[s] = inline($"var a = {s};pusha;");
+    }
+    // TODO; refactor away repetition in the next two functions.
+    public static void TickDef(Word w, Translator tr) {
+        var s = NextWordNorm(tr);
+        var word = tr.words[s];
+
+        if(!word.tickdefined) {
+            tr.Emit($"void {s}() {{\n");
+            ExecuteDef(word, tr);
+            tr.Emit("\n}");
+
+            tr.Emit($"vm.xts[vm.xtsp] = {s};vm.wordToXts[\"{s}\"] = vm.xtsp; VmExt.push(ref vm, vm.xtsp);vm.xtsp++;");
+            word.tickdefined = true;
+            tr.words[s] = word;
+        } else {
+            tr.Emit($"VmExt.push(ref vm, vm.wordToXts[\"{s}\"]);");
+        }
+    }
+    public static void TickDefIm(Word w, Translator tr) {
+        var s = NextWordNorm(tr);
+        var word = tr.words[s];
+
+        if(!word.tickdefined) {
+            tr.Emit($"void {s}() {{\n");
+            ExecuteDef(word, tr);
+            tr.Emit("\n}");
+
+            tr.Emit($"vm.xts[vm.xtsp] = {s};vm.wordToXts[\"{s}\"] = vm.xtsp; VmExt.push(ref vm, vm.xtsp);vm.xtsp++;");
+            word.tickdefined = true;
+            tr.words[s] = word;
+        } 
+        Compile(verbatim($"VmExt.push(ref vm, vm.wordToXts[\"{s}\"]);"), tr);
+    }
+    public static void ExitDef(Word w, Translator tr) {
+        var last = tr.lastWord;
+        if(string.IsNullOrWhiteSpace(last)) throw new Exception("Trying to Exit from an undefined word or outside a word.");
+        tr.Emit($"goto {last}_end;\n");
     }
     public static void dotString(Word w, Translator tr) {
         var s = tr.NextWord('"');
@@ -163,6 +224,10 @@ public class Translator {
 var {e} = VmExt.pop(ref vm);
 for(var {i} = {s};{i} < {e}; {i}++) {{
 ");
+    }
+    public static void LoopPlusDef(Word w, Translator tr) {
+        var i = $"___i{tr.nested}";
+        tr.Emit($"{{ var a = VmExt.pop(ref vm); {i} += a;}};}}");
     }
 
     public static void IDef(Word w, Translator tr) {
@@ -208,7 +273,7 @@ for(var {i} = {s};{i} < {e}; {i}++) {{
     }
 
     public static Definition ExecuteWords(IEnumerable<Word> words) =>
-        (Word w, Translator tr) => { foreach(var word in words) word.def(w, tr); };
+        (Word w, Translator tr) => { foreach(var word in words) ExecuteDef(word, tr); };
 
     public static Word inline(string instructions) => new Word {
         immediate = false, export = false, def = (word, tr) => {
@@ -231,7 +296,14 @@ for(var {i} = {s};{i} < {e}; {i}++) {{
         immediate = immediate, export = true, def = f };
 
     public static void PushNumber(string n, Translator tr) {
+
+// Having to support the bonkers base feature in Forth slows things down as every push needs to be
+// base-converted. You can disable base aware input by defining NOBASE.
+#if NOBASE
         var s = $"VmExt.push(ref vm, {n});";
+#else
+        var s = $"VmExt.pushs(ref vm, \"{n}\");";
+#endif
         tr.Emit(s);
     }
     public static void CompileNumber(string word, Translator tr) {
@@ -244,13 +316,24 @@ for(var {i} = {s};{i} < {e}; {i}++) {{
         if(tr.InDefinition) CompileNumber(aNumber, tr);
         else PushNumber(aNumber, tr);
     }
+    // At compile time we don't know the base and the size of the cell (nint) for the Forth VM.
+    // We try them all and get a runtime exception if we guess wrong.
+    private static bool IsANumberInAnyBase(string? s) {
+        foreach(var b in new int[] { 2, 8, 10, 16 }) { // Screw you, base 9.
+            try { var _ = (nint)Convert.ToSByte(s, b); return true;} catch(Exception) { }
+            try { var _ = (nint)Convert.ToInt16(s, b); return true;} catch(Exception) { }
+            try { var _ = (nint)Convert.ToInt32(s, b); return true;} catch(Exception) { }
+            try { var _ = (nint)Convert.ToInt64(s, b); return true;} catch(Exception) { }
+        }
+        return false;
+    }
     public static void TranslateWord(string word, Translator tr) {
         word = word.ToLowerInvariant();
         if(tr.words.TryGetValue(word, out var v)) { // Keep symbols (i.e, +, -).
             Perform(v, tr);
         } else if(tr.words.TryGetValue(ToCsharpId(word), out var vc)) { // Transform symbols to C#.
             Perform(vc, tr);
-        } else if(nint.TryParse(word, out var _)) {
+        } else if(IsANumberInAnyBase(word)) {
             PerformNumber(word, tr);
         } else {
             throw new Exception($"Word '{word}' not in the dictionary.");
@@ -376,27 +459,38 @@ static public partial class __GEN {{
             {"fill"    ,  intrinsic("fill")},
             {"blank"    ,  intrinsic("blank")},
             {"erase"    ,  intrinsic("erase")},
+            {"u.r"    ,  intrinsic("urdot")},
 
             {"_labelHere"      ,  intrinsic("_labelHere")},
 
             {"create" , function(CreateDef    , false)} ,
+            {"variable" , function(CreateDef    , false)} ,
+            {"constant" , function(ConstantDef    , false)} ,
             {":"      , function(ColonDef     , false)} ,
             {";"      , function(SemiColonDef , true)}  ,
             {"does>"  , function(DoesDef      , true)}  ,
             {"("  , function(CommentP      , true)}  ,
             {"\\"  , function(CommentS      , true)}  ,
             {"do"  , function(DoDef      , false)}  ,
+            {"+loop"  , function(LoopPlusDef      , false)}  ,
             {"loop"  , verbatim("}")}  ,
             {"i"  , function(IDef      , false)}  ,
             {"j"  , function(JDef      , false)}  ,
             {".\""  , function(dotString      , true)}  ,
             {"[char]"  , function(charIm      , true)}  ,
             {"abort\""  , function(abort      , true)}  ,
+            {"'"  , function(TickDef      , false)}  ,
+            {"[']"  , function(TickDefIm      , true)}  ,
+            {"exit"  , function(ExitDef      , false)}  ,
 
-            {"."       ,   inline("popa;vm.output.Write(a);vm.output.Write(' ');")},
+            {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
             {"swap"      ,   inline("popa;popb;pusha;pushb;")},
             {"rot"      ,   inline("popa;popb;popc;pushb;pusha;pushc;")},
+            {"base"      ,   inline("basepu;")},
+            {"decimal"      ,   inline("var a = 10;pusha;basepu;_store;")},
+            {"hex"      ,   inline("var a = 16;pusha;basepu;_store;")},
+            {"?"      ,   inline("_fetch;_dot;")},
 
             {"if"      ,   verbatim("if(VmExt.pop(ref vm) != 0) {")},
             {"else"      ,   verbatim("} else {")},
@@ -413,6 +507,7 @@ static public partial class __GEN {{
             {"spaces"      ,   inline("popa;for(var i = 0; i < a; i++) vm.output.Write(' ');")},
             {"space"      ,   inline("vm.output.Write(' ');")},
             {"emit"      ,   inline("popa;vm.output.Write((char)a);")},
+            {"execute"      ,   inline("popa;vm.xts[a]();")},
         };
 
     // Maps symbols to words

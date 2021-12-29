@@ -1,3 +1,4 @@
+#define NOBASEOFF
 using System.Runtime.InteropServices;
 using System;
 using System.IO;
@@ -11,8 +12,6 @@ public class REAttribute : Attribute { };
  * at the boundaries of the API.
  */
 
-
-public delegate void Doer(ref Vm vm);
 
 public struct Vm
 {
@@ -32,11 +31,10 @@ public struct Vm
     public byte[] ds;
     public nint[] rs;
 
-    // Defined words need to store their doer behvior as their name might change at runtime.
-    public Dictionary<string, Doer> doers = new();
-
-    // xts for words that has non standard does>.
-    public Dictionary<int, string> xts = new();
+    // xts for words
+    public Dictionary<string, int> wordToXts = new();
+    public Action[] xts;
+    public int xtsp = 0;
 
     // Data space index of a word.
     public Dictionary<string, int> words = new();
@@ -55,19 +53,25 @@ public struct Vm
     // state: compiling -> true, interpreting -> false.
     public int state = 0;
 
+    // Base management.
+    public int base_p;
+
     public Vm(TextReader input,
               TextWriter output,
               int ps_max_cells = 64,
               int ds_max_bytes = 64 * 1_024,
               int rs_max_cells = 64,
               int source_max_chars = 1_024,
-              int word_max_chars = 31)
+              int word_max_chars = 31,
+              int xts_max = 64
+              )
     {
 
         ps = new nint[ps_max_cells * CELL_SIZE];
         ds = new byte[ds_max_bytes];
         rs = new nint[rs_max_cells * CELL_SIZE];
 
+        xts = new Action[xts_max];
         this.input = input;
         this.output = output;
 
@@ -78,6 +82,10 @@ public struct Vm
 
         this.source_max_chars = source_max_chars;
         this.word_max_chars = word_max_chars;
+
+        base_p = here_p;
+        here_p += CELL_SIZE;
+        ds[base_p] = 10;
     }
     public void reset() {
         // Don't restart the ds. Is that right?
@@ -87,7 +95,21 @@ public struct Vm
 
 public static partial class VmExt
 {
-
+    // This slow code is not called if you define NOBASE
+    private static nint ConvertToBase(ref Vm vm, string s) {
+        var b = basev(ref vm);
+        switch(vm.CELL_SIZE) {
+            case 1: return (nint)Convert.ToSByte(s, b);
+            case 2: return (nint)Convert.ToInt16(s, b);
+            case 4: return (nint)Convert.ToInt32(s, b);
+            case 8: return (nint)Convert.ToInt64(s, b);
+        }
+        throw new Exception($"Cannot convert {s} to base {b}.");
+    }
+    [RE] public static void pushs(ref Vm vm, string s) => push(ref vm, ConvertToBase(ref vm, s));
+    // Base manipulation.
+    [RE] public static void basepu(ref Vm vm) => push(ref vm, vm.base_p);
+    [RE] public static int basev(ref Vm vm) => vm.ds[vm.base_p];
     // Parameter Stack manipulation implementation routines. Not checking array boundaries as .net does it for me.
     [RE] public static void depth(ref Vm vm) => push(ref vm, vm.top);
     [RE] public static void push(ref Vm vm, nint c) => vm.ps[vm.top++] = c;
@@ -222,9 +244,8 @@ public static partial class VmExt
         push(ref vm, (nint)' ');
         fill(ref vm);
     }
-    // Input/Word manipulation routines.
 
-    /** Input/output area management **/
+    // Input/Word manipulation routines.
     [RE]
     public static void type(ref Vm vm)
     {
@@ -232,6 +253,7 @@ public static partial class VmExt
         var a = popi(ref vm);
         var chars = ToChars(ref vm, a, l);
         vm.output.Write(chars.ToString());
+        vm.output.WriteLine();
     }
 
     [RE]
@@ -333,16 +355,34 @@ public static partial class VmExt
         push(ref vm, vm.words[s]);
     }
 
-    [RE]public static void _do(ref Vm vm, string word) {
-        if(vm.doers.TryGetValue(word, out var f)) f(ref vm);
-        else if(vm.words.TryGetValue(word, out var a)) push(ref vm, a);
-        else throw new Exception($"{word} is not a word in the dictionary");
-    }
     [RE] public static void _dots(ref Vm vm) {
         vm.output.Write($"<{vm.top}> ");
-        for(int i = 0; i < vm.top; i++) vm.output.Write($" {vm.ps[i]}");
+        for(int i = 0; i < vm.top; i++) { push(ref vm, vm.ps[i]); _dot(ref vm);}
         vm.output.WriteLine();
-        vm.output.WriteLine();
+    }
+    [RE] public static void _dot(ref Vm vm) {
+        var n = pop(ref vm);
+#if NOBASE
+        vm.output.Write(n);
+#else
+        var b = vm.ds[vm.base_p];
+        vm.output.Write(Convert.ToString(n, b));
+#endif
+        vm.output.Write(' ');
+    }
+    [RE] public static void urdot(ref Vm vm) {
+        var a = pop(ref vm);
+        var n = pop(ref vm);
+#if NOBASE
+        var s = string.Format($"{{0,{a}}}", n.ToString());
+        vm.output.Write($"{s,a}");
+#else
+        var b = vm.ds[vm.base_p];
+        var s = Convert.ToString(n, b);
+        s = string.Format($"{{0,{a}}}", s);
+        vm.output.Write($"{s}");
+#endif
+        vm.output.Write(' ');
     }
     [RE] public static void dump(ref Vm vm) {
         var n = popi(ref vm);
