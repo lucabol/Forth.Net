@@ -80,7 +80,6 @@ public class Translator {
 
     private static void ExecuteDef(Word w, Translator tr) {
         w.def(w, tr);
-        //if(!string.IsNullOrWhiteSpace(w.name)) tr.Emit($"{w.name}_end:\n");
     }
     public static void Compile(Word w, Translator tr) {
         if(w.immediate)
@@ -188,11 +187,6 @@ public class Translator {
         } 
         Compile(verbatim($"VmExt.push(ref vm, vm.wordToXts[\"{s}\"]);"), tr);
     }
-    public static void ExitDef(Word w, Translator tr) {
-        var last = tr.lastWord;
-        if(string.IsNullOrWhiteSpace(last)) throw new Exception("Trying to Exit from an undefined word or outside a word.");
-        tr.Emit($"goto {last}_end;\n");
-    }
     public static void dotString(Word w, Translator tr) {
         var s = tr.NextWord('"');
         if(s == null) throw new Exception("End of input stream after .\"");
@@ -273,7 +267,15 @@ for(var {i} = {s};{i} < {e}; {i}++) {{
     }
 
     public static Definition ExecuteWords(IEnumerable<Word> words) =>
-        (Word w, Translator tr) => { foreach(var word in words) ExecuteDef(word, tr); };
+        (Word w, Translator tr) => {
+            // Ugly way to support return. Kind of simulate a subroutine call in a peephole optimization.
+            // TODO: test it is optimized away as it should.
+            if(!tr.InDefinition) tr.Emit("do {\n");
+
+            foreach(var word in words) ExecuteDef(word, tr);
+
+            if(!tr.InDefinition) tr.Emit("} while(false);\n");
+        };
 
     public static Word inline(string instructions) => new Word {
         immediate = false, export = false, def = (word, tr) => {
@@ -481,7 +483,7 @@ static public partial class __GEN {{
             {"abort\""  , function(abort      , true)}  ,
             {"'"  , function(TickDef      , false)}  ,
             {"[']"  , function(TickDefIm      , true)}  ,
-            {"exit"  , function(ExitDef      , false)}  ,
+            {"exit"  , verbatim("break;\n")}  ,
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
