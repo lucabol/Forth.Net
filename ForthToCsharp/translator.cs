@@ -187,6 +187,11 @@ public class Translator {
         } 
         Compile(verbatim($"VmExt.push(ref vm, vm.wordToXts[\"{s}\"]);"), tr);
     }
+    public static void immediateDef(Word w, Translator tr) {
+        var word = tr.words[tr.lastWord];
+        word.immediate = true;
+        tr.words[tr.lastWord] = word;
+    }
     public static void dotString(Word w, Translator tr) {
         var s = tr.NextWord('"');
         if(s == null) throw new Exception("End of input stream after .\"");
@@ -484,6 +489,9 @@ static public partial class __GEN {{
             {"'"  , function(TickDef      , false)}  ,
             {"[']"  , function(TickDefIm      , true)}  ,
             {"exit"  , verbatim("break;\n")}  ,
+            {"immediate"  , function(immediateDef, false)},
+            {"["  , function((Word w, Translator tr) => tr.InDefinition = false, true)},
+            {"]"  , function((Word w, Translator tr) => tr.InDefinition = true, true)},
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
