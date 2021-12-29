@@ -10,7 +10,8 @@ try {
         ResetColor();
     };
 
-    var vmCode  = File.ReadAllText("../ForthToCsharp/vm.cs");
+    //var vmCode  = File.ReadAllText("../ForthToCsharp/vm.cs");
+    var vmCode  = File.ReadAllText("../../../../ForthToCsharp/vm.cs");
     var vmnew   = "var vm = new Vm(System.Console.In, System.Console.Out);";
 
     Write("Initializing. Please wait ...");

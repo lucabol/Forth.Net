@@ -139,8 +139,8 @@ public class Translator {
          // the dictionary word for ar.
         if(tr.doesActions != null)
             tr.defActions.Add(function((Word w, Translator tr1) =>
-                        tr1.words[tr1.lastCreated] = function((Word w, Translator tr2) => 
-                                            ExecuteWords(tr.doesActions), false), false));
+                        tr1.words[tr1.lastCreated] = new Word { immediate = false,
+                        export = false, def = ExecuteWords(tr.doesActions) }, false));
 
         var wordName = ToCsharpId(tr.lastWord);
         // Attach the definition actions to the defining word (: array)
