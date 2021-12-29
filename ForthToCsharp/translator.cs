@@ -130,7 +130,7 @@ public class Translator {
         tr.actions = tr.doesActions;
         tr.doesActions.Add(
                 function((Word w, Translator tr1) => // tr1 is at time of does> execution.
-                    tr.Emit(ToCsharpInst("_pushLabel", $"\"{tr1.lastCreated}\"")), false));
+                    tr1.Emit(ToCsharpInst("_pushLabel", $"\"{tr1.lastCreated}\"")), false));
     }
     public static void SemiColonDef(Word w, Translator tr) {
         if(tr.defActions == null) throw new Exception("Semicolon (;) seen in interpret mode");
@@ -139,7 +139,7 @@ public class Translator {
          // the dictionary word for ar.
         if(tr.doesActions != null)
             tr.defActions.Add(function((Word w, Translator tr1) =>
-                        tr.words[tr1.lastCreated] = function((Word w, Translator tr2) => 
+                        tr1.words[tr1.lastCreated] = function((Word w, Translator tr2) => 
                                             ExecuteWords(tr.doesActions), false), false));
 
         var wordName = ToCsharpId(tr.lastWord);
