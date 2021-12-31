@@ -113,6 +113,8 @@ public static partial class VmExt
         }
         throw new Exception($"Cannot convert {s} to base {b}.");
     }
+    [RE] public static Func<nint, nint, bool> loopCond(nint s, nint e) =>
+        s < e ? (i, e1) => i < e1 : (i, e1) => i >= e1;
     [RE] public static void pushs(ref Vm vm, string s) => push(ref vm, ConvertToBase(ref vm, s));
     // Base manipulation.
     [RE] public static void basepu(ref Vm vm) => push(ref vm, vm.base_p);

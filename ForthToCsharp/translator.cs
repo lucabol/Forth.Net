@@ -239,16 +239,21 @@ public class Translator {
         tr.nested++;
 
         var i = $"___i{tr.nested}";
-        var s = $"___s{tr.nested}";
         var e = $"___e{tr.nested}";
-        tr.Emit($@"var {s} = VmExt.pop(ref vm);
+        var c = $"___c{tr.nested}";
+        tr.Emit($@"var {i} = VmExt.pop(ref vm);
 var {e} = VmExt.pop(ref vm);
-for(var {i} = {s};{i} < {e}; {i}++) {{
+var {c} = VmExt.loopCond({i}, {e});
+while({c}({i}, {e})) {{
 ");
+    }
+    public static void LoopDef(Word w, Translator tr) {
+        var i = $"___i{tr.nested}";
+        tr.Emit($"{i}++;\n}}");
     }
     public static void LoopPlusDef(Word w, Translator tr) {
         var i = $"___i{tr.nested}";
-        tr.Emit($"{{ var a = VmExt.pop(ref vm); {i} += a;}};}}");
+        tr.Emit($"{i} += VmExt.pop(ref vm);\n}}");
     }
 
     public static void IDef(Word w, Translator tr) {
@@ -506,7 +511,7 @@ static public partial class __GEN {{
             {"\\"  , function(CommentS      , true)}  ,
             {"do"  , function(DoDef      , false)}  ,
             {"+loop"  , function(LoopPlusDef      , false)}  ,
-            {"loop"  , verbatim("}")}  ,
+            {"loop"  , function(LoopDef      , false)}  ,
             {"i"  , function(IDef      , false)}  ,
             {"j"  , function(JDef      , false)}  ,
             {".\""  , function(dotString      , true)}  ,
