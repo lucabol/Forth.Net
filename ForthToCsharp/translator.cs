@@ -35,6 +35,7 @@ public class Translator {
 
     // Iteration count for for loops.
     public int nested = 0;
+    public Stack<int> loopStack = new();
 
     // Create unique names for goto statements.
     public int nameCount = 0;
@@ -237,6 +238,7 @@ public class Translator {
     public static void DoDef(Word w, Translator tr) {
 
         tr.nested++;
+        tr.loopStack.Push(tr.nested);
 
         var i = $"___i{tr.nested}";
         var e = $"___e{tr.nested}";
@@ -248,11 +250,11 @@ while({c}({i}, {e})) {{
 ");
     }
     public static void LoopDef(Word w, Translator tr) {
-        var i = $"___i{tr.nested}";
+        var i = $"___i{tr.loopStack.Pop()}";
         tr.Emit($"{i}++;\n}}");
     }
     public static void LoopPlusDef(Word w, Translator tr) {
-        var i = $"___i{tr.nested}";
+        var i = $"___i{tr.loopStack.Pop()}";
         tr.Emit($"{i} += VmExt.pop(ref vm);\n}}");
     }
 
