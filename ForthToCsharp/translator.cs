@@ -1,4 +1,5 @@
 #define NOBASEOFF
+#define NOFASTCONSTANT
 using System;
 using System.IO;
 using System.Collections.Generic;
@@ -81,6 +82,9 @@ public class Translator {
     private static void ExecuteDef(Word w, Translator tr) {
         w.def(w, tr);
     }
+    public static void CompileOrEmit(Word w, Translator tr) {
+        if (tr.InDefinition) Compile(w, tr); else ExecuteDef(w, tr);
+    }
     public static void Compile(Word w, Translator tr) {
         if(w.immediate)
             ExecuteDef(w, tr);
@@ -148,12 +152,25 @@ public class Translator {
             export = false, def = ExecuteWords(tr.defActions)};
         tr.InDefinition = false;
     }
-    // Try to use a c# constant instead of the dictionary for constants.
+    // Tried to use a c# constant instead of the dictionary for constants.
+    // It didn't work because, to support Exit, a new definition is wrapped in a do {} while loop.
+    // This makes the defined constant local to that scope, not visible outside it.
+    // But it is faster, so making it a compile time flag.
     public static void ConstantDef(Word w, Translator tr) {
         var s = NextWordNorm(tr);
 
         tr.Emit($"readonly nint {s} = VmExt.pop(ref vm);");
         tr.words[s] = inline($"var a = {s};pusha;");
+    }
+    public static void ConstantDef1(Word w, Translator tr) {
+        var s = NextWordNorm(tr);
+        tr.Emit(ToCsharpInst("_labelHere", $"\"{s}\""));
+        tr.Emit(ToCsharpInst("_comma"));
+        var op1 = ToCsharpInst("_pushLabel",  $"\"{s}\"");
+        var op2 = ToCsharpInst("_fetch");
+
+        if(tr.words.TryGetValue(s, out var _)) throw new Exception($"Trying to reassign the constant {s}");
+        tr.words[s] = inline($"{op1};{op2};");
     }
     // TODO; refactor away repetition in the next two functions.
     public static void TickDef(Word w, Translator tr) {
@@ -196,7 +213,7 @@ public class Translator {
         var s = tr.NextWord('"');
         if(s == null) throw new Exception("End of input stream after .\"");
 
-        Compile(function((Word w, Translator tr1) => tr1.Emit($"vm.output.WriteLine(\"{s}\");"), false), tr);
+        CompileOrEmit(function((Word w, Translator tr1) => tr1.Emit($"vm.output.WriteLine(\"{s}\");"), false), tr);
     }
     public static void abort(Word w, Translator tr) {
         var s = tr.NextWord('"');
@@ -205,11 +222,16 @@ public class Translator {
         void f(Word w, Translator tr1) {
             tr1.Emit($"if(VmExt.pop(ref vm) != 0) throw new Exception(\"{s}\");");
         }
-        Compile(function(f, false), tr);
+        CompileOrEmit(function(f, false), tr);
     }
     public static void charIm(Word w, Translator tr) {
         var s = tr.NextWord();
         if(s == null) throw new Exception("End of input stream after [char]");
+        CompileOrEmit(function((Word w, Translator tr1) => tr1.Emit($"VmExt.push(ref vm, {(int)s[0]});"), false), tr);
+    }
+    public static void charN(Word w, Translator tr) {
+        var s = tr.NextWord();
+        if(s == null) throw new Exception("End of input stream after char");
         tr.Emit($"VmExt.push(ref vm, {(int)s[0]});");
     }
     public static void DoDef(Word w, Translator tr) {
@@ -472,7 +494,11 @@ static public partial class __GEN {{
 
             {"create" , function(CreateDef    , false)} ,
             {"variable" , function(CreateDef    , false)} ,
+#if FASTCONSTANT
             {"constant" , function(ConstantDef    , false)} ,
+#else
+            {"constant" , function(ConstantDef1    , false)} ,
+#endif
             {":"      , function(ColonDef     , false)} ,
             {";"      , function(SemiColonDef , true)}  ,
             {"does>"  , function(DoesDef      , true)}  ,
@@ -485,6 +511,7 @@ static public partial class __GEN {{
             {"j"  , function(JDef      , false)}  ,
             {".\""  , function(dotString      , true)}  ,
             {"[char]"  , function(charIm      , true)}  ,
+            {"char"  , function(charN      , false)}  ,
             {"abort\""  , function(abort      , true)}  ,
             {"'"  , function(TickDef      , false)}  ,
             {"[']"  , function(TickDefIm      , true)}  ,
