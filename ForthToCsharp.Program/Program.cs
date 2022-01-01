@@ -12,10 +12,12 @@ try {
 
     var vmCode  = File.ReadAllText("../ForthToCsharp/vm.cs");
     //var vmCode  = File.ReadAllText("../../../../ForthToCsharp/vm.cs");
-    var vmnew   = "var vm = new Vm(System.Console.In, System.Console.Out);";
+
+    var globals = new Globals { input = Console.In, output = Console.Out };
+    var vmnew   = "var vm = new Vm(input, output);";
 
     Write("Initializing. Please wait ...");
-    var script = await CSharpScript.RunAsync(vmCode).ConfigureAwait(false);
+    var script = await CSharpScript.RunAsync(vmCode, globals: globals).ConfigureAwait(false);
     script     = await script.ContinueWithAsync(vmnew).ConfigureAwait(false);
     WriteLine(" done.");
     WriteLine("Say 'bye' to exit. No output means all good.");
@@ -66,6 +68,8 @@ void ColorLine(ConsoleColor color, string s) {
     WriteLine(s);
     ForegroundColor = backupcolor;
 }
+
+public class Globals { public TextReader? input; public TextWriter? output; }
 
 class AutoCompletionHandler : IAutoCompleteHandler
 {

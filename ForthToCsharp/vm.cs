@@ -367,6 +367,7 @@ public static partial class VmExt
         var ptr = vm.words[s] + literalCount * vm.CELL_SIZE;
         push(ref vm, vm.ds[ptr]);
     }
+    [RE] public static void _key(ref Vm vm) => push(ref vm, vm.input.Read());
 
     [RE] public static void _dots(ref Vm vm) {
         vm.output.Write($"<{vm.top}> ");

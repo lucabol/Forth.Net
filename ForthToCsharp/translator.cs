@@ -518,6 +518,7 @@ static public partial class __GEN {{
             {"u.r"    ,  intrinsic("urdot")},
 
             {"_labelHere"      ,  intrinsic("_labelHere")},
+            {"key"      ,  intrinsic("_key")},
 
             {"create" , function(CreateDef    , false)} ,
             {"variable" , function(CreateDef    , false)} ,
