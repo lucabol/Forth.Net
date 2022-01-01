@@ -40,6 +40,9 @@ public class Translator {
     // Create unique names for goto statements.
     public int nameCount = 0;
 
+    // Number of immediates in the definition;
+    public int literalCount = 0;
+
     public Translator(TextReader inputReader, StringBuilder output) {
         this.output  = output;
         this.inputReader = inputReader;
@@ -151,7 +154,11 @@ public class Translator {
         // Attach the definition actions to the defining word (: array)
         tr.words[wordName] = new Word { name = wordName, immediate = false,
             export = false, def = ExecuteWords(tr.defActions)};
-        tr.InDefinition = false;
+
+        tr.InDefinition   = false;
+        tr.doesActions    = null;
+        tr.defActions     = null;
+        tr.literalCount = 0;
     }
     // Tried to use a c# constant instead of the dictionary for constants.
     // It didn't work because, to support Exit, a new definition is wrapped in a do {} while loop.
@@ -234,6 +241,19 @@ public class Translator {
         var s = tr.NextWord();
         if(s == null) throw new Exception("End of input stream after char");
         tr.Emit($"VmExt.push(ref vm, {(int)s[0]});");
+    }
+    public static void PostponeDef(Word w, Translator tr) {
+        var s = NextWordNorm(tr);
+        if(s == null) throw new Exception("End of input stream after postpone");
+
+        var word = tr.words[s];
+
+        if(tr.actions == null) throw new Exception($"Trying to postpone {s} outside a definition");
+        tr.actions.Add(word);
+    }
+    public static void LiteralDef(Word w, Translator tr) {
+        tr.Emit("VmExt._comma(ref vm);"); // Store value from top of stack on Here, move here fwd.
+        Compile(verbatim($"VmExt._pushLabelValue(ref vm, \"{tr.lastWord}\", {tr.literalCount++});"), tr);
     }
     public static void DoDef(Word w, Translator tr) {
 
@@ -526,6 +546,8 @@ static public partial class __GEN {{
             {"immediate"  , function(immediateDef, false)},
             {"["  , function((Word w, Translator tr) => tr.InDefinition = false, true)},
             {"]"  , function((Word w, Translator tr) => tr.InDefinition = true, true)},
+            {"postpone"  , function(PostponeDef, true)},
+            {"literal"  , function(LiteralDef, true)},
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},

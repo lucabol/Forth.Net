@@ -363,6 +363,10 @@ public static partial class VmExt
     [RE]public static void _pushLabel(ref Vm vm, string s) {
         push(ref vm, vm.words[s]);
     }
+    [RE]public static void _pushLabelValue(ref Vm vm, string s, int literalCount) {
+        var ptr = vm.words[s] + literalCount * vm.CELL_SIZE;
+        push(ref vm, vm.ds[ptr]);
+    }
 
     [RE] public static void _dots(ref Vm vm) {
         vm.output.Write($"<{vm.top}> ");
