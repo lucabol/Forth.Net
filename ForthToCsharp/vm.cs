@@ -53,6 +53,9 @@ public struct Vm
     // pad buffer.
     public int pad;
 
+    // strings buffer.
+    public int strings;
+
     // state: compiling -> true, interpreting -> false.
     public int state = 0;
 
@@ -67,7 +70,8 @@ public struct Vm
               int source_max_chars = 1_024,
               int word_max_chars = 31,
               int xts_max = 64,
-              int pad_max = 64
+              int pad_max = 64,
+              int strings_max_chars = 1_024
               )
     {
 
@@ -93,6 +97,9 @@ public struct Vm
         base_p = here_p;
         here_p += CELL_SIZE;
         ds[base_p] = 10;
+
+        strings = here_p;
+        here_p += strings_max_chars * Vm.CHAR_SIZE;
     }
     public void reset() {
         // Don't restart the ds. Is that right?
@@ -282,6 +289,22 @@ public static partial class VmExt
         push(ref vm, a + Vm.CHAR_SIZE);
         push(ref vm, c);
     }
+    [RE]
+    public static void _fromDotNetString(ref Vm vm, string s, bool isCountedString) {
+        var len = s.Length;
+        var target = ToChars(ref vm, vm.strings, len + 1);
+        var source = s.AsSpan();
+        if(isCountedString) {
+            target[0] = (char)len;
+            source.CopyTo(target[1..]);
+            push(ref vm, vm.strings);
+        } else {
+            source.CopyTo(target);
+            push(ref vm, vm.strings);
+            push(ref vm, len);
+        }
+    }
+    [RE]
     public static string dotNetString(ref Vm vm)
     {
         var c = popi(ref vm);

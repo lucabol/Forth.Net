@@ -217,6 +217,18 @@ public class Translator {
         word.immediate = true;
         tr.words[tr.lastWord] = word;
     }
+    public static void CStringDef(Word w, Translator tr) {
+        var s = tr.NextWord('"');
+        if(s == null) throw new Exception("End of input stream after c\"");
+
+        CompileOrEmit(inline($"VmExt._fromDotNetString(ref vm, \"{s}\", true);"), tr);
+    }
+    public static void SStringDef(Word w, Translator tr) {
+        var s = tr.NextWord('"');
+        if(s == null) throw new Exception("End of input stream after s\"");
+
+        CompileOrEmit(inline($"VmExt._fromDotNetString(ref vm, \"{s}\", false);"), tr);
+    }
     public static void dotString(Word w, Translator tr) {
         var s = tr.NextWord('"');
         if(s == null) throw new Exception("End of input stream after .\"");
@@ -549,6 +561,8 @@ static public partial class __GEN {{
             {"]"  , function((Word w, Translator tr) => tr.InDefinition = true, true)},
             {"postpone"  , function(PostponeDef, true)},
             {"literal"  , function(LiteralDef, true)},
+            {"s\""  , function(SStringDef, true)},
+            {"c\""  , function(CStringDef, true)},
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
