@@ -151,14 +151,17 @@ public class Translator {
                         export = false, def = ExecuteWords(tr.doesActions) }, false));
 
         var wordName = ToCsharpId(tr.lastWord);
-        // Attach the definition actions to the defining word (: array)
-        tr.words[wordName] = new Word { name = wordName, immediate = false,
-            export = false, def = ExecuteWords(tr.defActions)};
 
-        tr.InDefinition   = false;
-        tr.doesActions    = null;
-        tr.defActions     = null;
+        // Attach the definition actions to the defining word (: array)
+        var word =  new Word { name = wordName, immediate = false,
+            export = false, def = ExecuteWords(tr.defActions)};
+        tr.words[wordName] = word;
+
+        RecurseSubst(tr.defActions, ref word);
+        if(tr.doesActions != null) RecurseSubst(tr.doesActions, ref word);
+
         tr.literalCount = 0;
+        tr.InDefinition   = false;
     }
     // Tried to use a c# constant instead of the dictionary for constants.
     // It didn't work because, to support Exit, a new definition is wrapped in a do {} while loop.
@@ -186,7 +189,7 @@ public class Translator {
         var word = tr.words[s];
 
         if(!word.tickdefined) {
-            tr.Emit($"void {s}() {{\n");
+            tr.Emit($"static void {s}(ref Vm vm) {{\n");
             ExecuteDef(word, tr);
             tr.Emit("\n}");
 
@@ -202,7 +205,7 @@ public class Translator {
         var word = tr.words[s];
 
         if(!word.tickdefined) {
-            tr.Emit($"void {s}() {{\n");
+            tr.Emit($"static void {s}(ref Vm vm) {{\n");
             ExecuteDef(word, tr);
             tr.Emit("\n}");
 
@@ -216,6 +219,14 @@ public class Translator {
         var word = tr.words[tr.lastWord];
         word.immediate = true;
         tr.words[tr.lastWord] = word;
+    }
+    public static void RecurseSubst(List<Word> actions, ref Word word) {
+        for(int i = 0; i < actions.Count; i++)
+            if(actions[i].name == "recurse") actions[i] = word;
+    }
+    public static void RecurseDef(Word w, Translator tr) {
+        if(tr.actions == null) throw new Exception("Null actions while processing 'recurse'");
+        tr.actions.Add(new Word { name = "recurse" });
     }
     public static void CStringDef(Word w, Translator tr) {
         var s = tr.NextWord('"');
@@ -563,6 +574,7 @@ static public partial class __GEN {{
             {"literal"  , function(LiteralDef, true)},
             {"s\""  , function(SStringDef, true)},
             {"c\""  , function(CStringDef, true)},
+            {"recurse"  , function(RecurseDef, true)},
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
@@ -589,7 +601,7 @@ static public partial class __GEN {{
             {"spaces"      ,   inline("popa;for(var i = 0; i < a; i++) vm.output.Write(' ');")},
             {"space"      ,   inline("vm.output.Write(' ');")},
             {"emit"      ,   inline("popa;vm.output.Write((char)a);")},
-            {"execute"      ,   inline("popa;vm.xts[a]();")},
+            {"execute"      ,   inline("popa;vm.xts[a](ref vm);")},
         };
 
     // Maps symbols to words

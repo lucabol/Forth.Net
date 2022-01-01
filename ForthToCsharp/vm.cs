@@ -12,6 +12,7 @@ public class REAttribute : Attribute { };
  * at the boundaries of the API.
  */
 
+public delegate void ActionRef<T>(ref T item);
 
 public struct Vm
 {
@@ -33,7 +34,7 @@ public struct Vm
 
     // xts for words
     public Dictionary<string, int> wordToXts = new();
-    public Action[] xts;
+    public ActionRef<Vm>[] xts;
     public int xtsp = 0;
 
     // Data space index of a word.
@@ -79,7 +80,7 @@ public struct Vm
         ds = new byte[ds_max_bytes];
         rs = new nint[rs_max_cells * CELL_SIZE];
 
-        xts = new Action[xts_max];
+        xts = new ActionRef<Vm>[xts_max];
         this.input = input;
         this.output = output;
 
