@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 
 using static System.Console;
@@ -80,7 +79,10 @@ class AutoCompletionHandler : IAutoCompleteHandler
     {
         if(string.IsNullOrWhiteSpace(text)) return words.ToArray();
 
-        return words.Where(s => s.StartsWith(text)).ToArray();
+        return words.Where(
+                s => s.StartsWith(
+                text.Split(' ', StringSplitOptions.TrimEntries | StringSplitOptions.TrimEntries).Last())
+                ).ToArray();
     }
 
     public AutoCompletionHandler(Translator tr) {
