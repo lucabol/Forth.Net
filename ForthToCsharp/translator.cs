@@ -5,6 +5,7 @@ using System.IO;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
+using System.Diagnostics.CodeAnalysis;
 
 public delegate void Definition(Word w, Translator tr);
 
@@ -183,37 +184,39 @@ public class Translator {
         if(tr.words.TryGetValue(s, out var _)) throw new Exception($"Trying to reassign the constant {s}");
         tr.words[s] = inline($"{op1};{op2};");
     }
-    // TODO; refactor away repetition in the next two functions.
-    public static void TickDef(Word w, Translator tr) {
-        var s = NextWordNorm(tr);
-        var word = tr.words[s];
 
-        if(!word.tickdefined) {
+    public static void EmitFunc(Word w, Translator tr) {
+        if(!w.tickdefined) {
+            var s = w.name;
+            if(string.IsNullOrWhiteSpace(w.name))
+                throw new Exception("Try to generate a function for an empty word");
+
             tr.Emit($"static void {s}(ref Vm vm) {{\n");
-            ExecuteDef(word, tr);
+            ExecuteDef(w, tr);
             tr.Emit("\n}");
 
             tr.Emit($"vm.xts[vm.xtsp] = {s};vm.wordToXts[\"{s}\"] = vm.xtsp; VmExt.push(ref vm, vm.xtsp);vm.xtsp++;");
-            word.tickdefined = true;
-            tr.words[s] = word;
-        } else {
-            tr.Emit($"VmExt.push(ref vm, vm.wordToXts[\"{s}\"]);");
+            w.tickdefined = true;
+            tr.words[s] = w;
         }
     }
-    public static void TickDefIm(Word w, Translator tr) {
-        var s = NextWordNorm(tr);
-        var word = tr.words[s];
+    // TODO; refactor away repetition in the next two functions.
+    public static void TickDef(Word w, Translator tr) {
+        var s = tr.NextWord();
+        if(string.IsNullOrWhiteSpace(s)) throw new Exception("End of stream while processing tick '");
 
-        if(!word.tickdefined) {
-            tr.Emit($"static void {s}(ref Vm vm) {{\n");
-            ExecuteDef(word, tr);
-            tr.Emit("\n}");
+        var found = TryGetWordFromRawString(tr, s, out var word);
+        if(!found) throw new Exception($"Executing tick ('), cannot find word {s}");
 
-            tr.Emit($"vm.xts[vm.xtsp] = {s};vm.wordToXts[\"{s}\"] = vm.xtsp; VmExt.push(ref vm, vm.xtsp);vm.xtsp++;");
-            word.tickdefined = true;
+        // Hack: back-patch the word name because it doesn't get generated for non user defined words.
+        if(string.IsNullOrWhiteSpace(word.name)) {
+            word.name = ToCsharpId(s);
             tr.words[s] = word;
-        } 
-        Compile(verbatim($"VmExt.push(ref vm, vm.wordToXts[\"{s}\"]);"), tr);
+        }
+
+        EmitFunc(word, tr);
+
+        tr.Emit($"VmExt.push(ref vm, vm.wordToXts[\"{s}\"]);");
     }
     public static void immediateDef(Word w, Translator tr) {
         var word = tr.words[tr.lastWord];
@@ -406,12 +409,18 @@ while({c}({i}, {e})) {{
         }
         return false;
     }
+    public static bool TryGetWordFromRawString(Translator tr, string rawWordName, [MaybeNullWhen(false)] out Word word) {
+        var w = rawWordName.ToLowerInvariant();
+        if(tr.words.TryGetValue(w, out var v)) { // Keep symbols (i.e, +, -).
+            word = v; return true;
+        } else if(tr.words.TryGetValue(ToCsharpId(w), out var vc)) { // Transform symbols to C#.
+            word = vc; return true;
+        }
+        word = default!; return false;
+    }
     public static void TranslateWord(string word, Translator tr) {
-        word = word.ToLowerInvariant();
-        if(tr.words.TryGetValue(word, out var v)) { // Keep symbols (i.e, +, -).
+        if(TryGetWordFromRawString(tr, word, out Word v)) { // Keep symbols (i.e, +, -).
             Perform(v, tr);
-        } else if(tr.words.TryGetValue(ToCsharpId(word), out var vc)) { // Transform symbols to C#.
-            Perform(vc, tr);
         } else if(IsANumberInAnyBase(word)) {
             PerformNumber(word, tr);
         } else {
@@ -565,7 +574,7 @@ static public partial class __GEN {{
             {"char"  , function(charN      , false)}  ,
             {"abort\""  , function(abort      , true)}  ,
             {"'"  , function(TickDef      , false)}  ,
-            {"[']"  , function(TickDefIm      , true)}  ,
+            {"[']"  , function(TickDef      , true)}  ,
             {"exit"  , verbatim("break;\n")}  ,
             {"immediate"  , function(immediateDef, false)},
             {"["  , function((Word w, Translator tr) => tr.InDefinition = false, true)},
@@ -619,6 +628,7 @@ static public partial class __GEN {{
         {'*', "mult"},
         {'(', "oparens"},
         {')', "cparens"},
+        {'.', "dot"},
     };
 
     public static Dictionary<string, string> specialInsts = new() {
