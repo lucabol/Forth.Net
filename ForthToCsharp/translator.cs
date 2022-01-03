@@ -47,6 +47,13 @@ public class Translator {
     public Translator(TextReader inputReader, StringBuilder output) {
         this.output  = output;
         this.inputReader = inputReader;
+
+        // TODO: this is a hack. The word constructing words should set the name.
+        foreach(var key in words.Keys) {
+            var w = words[key];
+            w.name = key;
+            words[key] = w;
+        }
     }
 
     // I can't use an iterator returning method because CreateWord need access to the next word.
@@ -103,16 +110,16 @@ public class Translator {
         else ExecuteDef(w, tr);
     }
 
-    private static string NextWordNorm(Translator tr) {
+    private static string NextWordLower(Word w, Translator tr) {
         var s = tr.NextWord();
-        if(s == null) throw new Exception($"End of input stream after {s}");
+        if(s == null) throw new Exception($"Unexpected end of input stream while processing {w.name}.");
+
         s = s.ToLowerInvariant();
-        s = ToCsharpId(s);
         return s;
     }
 
     public static void ColonDef(Word w, Translator tr) {
-        var s = NextWordNorm(tr);
+        var s = NextWordLower(w, tr);
 
         tr.lastWord    = s;
         tr.defActions  = new();
@@ -124,7 +131,7 @@ public class Translator {
         tr.InDefinition = true;
     }
     public static void CreateDef(Word w, Translator tr) {
-        var s = NextWordNorm(tr);
+        var s = NextWordLower(w, tr);
 
         tr.lastCreated = s;
         tr.Emit(ToCsharpInst("_labelHere", $"\"{s}\""));
@@ -151,15 +158,14 @@ public class Translator {
                         tr1.words[tr1.lastCreated] = new Word { immediate = false,
                         export = false, def = ExecuteWords(tr.doesActions) }, false));
 
-        var wordName = ToCsharpId(tr.lastWord);
+        var wordName = tr.lastWord;
 
         // Attach the definition actions to the defining word (: array)
         var word =  new Word { name = wordName, immediate = false,
             export = false, def = ExecuteWords(tr.defActions)};
         tr.words[wordName] = word;
 
-        RecurseSubst(tr.defActions, ref word);
-        if(tr.doesActions != null) RecurseSubst(tr.doesActions, ref word);
+        RecurseSubst(tr, ref word);
 
         tr.literalCount = 0;
         tr.InDefinition   = false;
@@ -169,13 +175,13 @@ public class Translator {
     // This makes the defined constant local to that scope, not visible outside it.
     // But it is faster, so making it a compile time flag.
     public static void ConstantDef(Word w, Translator tr) {
-        var s = NextWordNorm(tr);
+        var s = NextWordLower(w, tr);
 
         tr.Emit($"readonly nint {s} = VmExt.pop(ref vm);");
         tr.words[s] = inline($"var a = {s};pusha;");
     }
     public static void ConstantDef1(Word w, Translator tr) {
-        var s = NextWordNorm(tr);
+        var s = NextWordLower(w, tr);
         tr.Emit(ToCsharpInst("_labelHere", $"\"{s}\""));
         tr.Emit(ToCsharpInst("_comma"));
         var op1 = ToCsharpInst("_pushLabel",  $"\"{s}\"");
@@ -185,47 +191,63 @@ public class Translator {
         tr.words[s] = inline($"{op1};{op2};");
     }
 
-    public static void EmitFunc(Word w, Translator tr) {
-        if(!w.tickdefined) {
-            var s = w.name;
-            if(string.IsNullOrWhiteSpace(w.name))
-                throw new Exception("Try to generate a function for an empty word");
+    public static void EmitFunc(Word w, Translator tr, string funcName) {
+        if(string.IsNullOrWhiteSpace(w.name))
+            throw new Exception("Try to generate a function for an empty word");
 
-            tr.Emit($"static void {s}(ref Vm vm) {{\n");
-            ExecuteDef(w, tr);
-            tr.Emit("\n}");
+        tr.Emit($"static void {funcName}(ref Vm vm) {{\n");
+        tr.Emit("do {\n");
+        ExecuteDef(w, tr);
+        tr.Emit("\n} while(false);");
+        tr.Emit("\n}");
 
-            tr.Emit($"vm.xts[vm.xtsp] = {s};vm.wordToXts[\"{s}\"] = vm.xtsp; VmExt.push(ref vm, vm.xtsp);vm.xtsp++;");
+    }
+    public static void RegisterTick(Word w, Translator tr, string funcName) {
+            tr.Emit($"vm.xts[vm.xtsp] = {funcName};vm.wordToXts[\"{w.name}\"] = vm.xtsp; vm.xtsp++;");
             w.tickdefined = true;
-            tr.words[s] = w;
-        }
+            tr.words[w.name] = w;
     }
     // TODO; refactor away repetition in the next two functions.
     public static void TickDef(Word w, Translator tr) {
-        var s = tr.NextWord();
-        if(string.IsNullOrWhiteSpace(s)) throw new Exception("End of stream while processing tick '");
+        var s = NextWordLower(w, tr);
+        var funcName = ToCsharpId(s);
 
-        var found = TryGetWordFromRawString(tr, s, out var word);
-        if(!found) throw new Exception($"Executing tick ('), cannot find word {s}");
+        if(!tr.words.TryGetValue(s, out var word))
+            throw new Exception($"Executing tick ('), cannot find word {s}");
 
-        // Hack: back-patch the word name because it doesn't get generated for non user defined words.
-        if(string.IsNullOrWhiteSpace(word.name)) {
-            word.name = ToCsharpId(s);
-            tr.words[s] = word;
+        if(!word.tickdefined) {
+            EmitFunc(word, tr, funcName);
+            RegisterTick(word, tr, funcName);
         }
-
-        EmitFunc(word, tr);
-
-        tr.Emit($"VmExt.push(ref vm, vm.wordToXts[\"{s}\"]);");
+        var op = $"VmExt.push(ref vm, vm.wordToXts[\"{word.name}\"]);";
+        if(w.immediate)
+            Compile(verbatim(op), tr);
+        else
+            tr.Emit(op);
     }
     public static void immediateDef(Word w, Translator tr) {
         var word = tr.words[tr.lastWord];
         word.immediate = true;
         tr.words[tr.lastWord] = word;
     }
-    public static void RecurseSubst(List<Word> actions, ref Word word) {
-        for(int i = 0; i < actions.Count; i++)
-            if(actions[i].name == "recurse") actions[i] = word;
+
+    public static void RecurseSubst(Translator tr, ref Word word) {
+        if(tr.defActions == null) throw new Exception("Semicolon outside a definition perhaps?");
+
+        var funcName = ToCsharpId(word.name);
+
+        var actionsWithRecurse = tr.doesActions == null ?
+            new List<Word>[] { tr.defActions} :
+            new List<Word>[] { tr.defActions, tr.doesActions } ;
+
+        var isRecurse = false;
+        foreach(var actions in actionsWithRecurse)
+            for(int i = 0; i < actions.Count; i++)
+                if(actions[i].name == "recurse") {
+                    actions[i] = verbatim($"{funcName}(ref vm);");
+                    isRecurse = true;
+                }
+        if(isRecurse) EmitFunc(word, tr, funcName);
     }
     public static void RecurseDef(Word w, Translator tr) {
         if(tr.actions == null) throw new Exception("Null actions while processing 'recurse'");
@@ -269,8 +291,7 @@ public class Translator {
         tr.Emit($"VmExt.push(ref vm, {(int)s[0]});");
     }
     public static void PostponeDef(Word w, Translator tr) {
-        var s = NextWordNorm(tr);
-        if(s == null) throw new Exception("End of input stream after postpone");
+        var s = NextWordLower(w, tr);
 
         var word = tr.words[s];
 
@@ -409,17 +430,8 @@ while({c}({i}, {e})) {{
         }
         return false;
     }
-    public static bool TryGetWordFromRawString(Translator tr, string rawWordName, [MaybeNullWhen(false)] out Word word) {
-        var w = rawWordName.ToLowerInvariant();
-        if(tr.words.TryGetValue(w, out var v)) { // Keep symbols (i.e, +, -).
-            word = v; return true;
-        } else if(tr.words.TryGetValue(ToCsharpId(w), out var vc)) { // Transform symbols to C#.
-            word = vc; return true;
-        }
-        word = default!; return false;
-    }
     public static void TranslateWord(string word, Translator tr) {
-        if(TryGetWordFromRawString(tr, word, out Word v)) { // Keep symbols (i.e, +, -).
+        if(tr.words.TryGetValue(word, out Word v)) { // Keep symbols (i.e, +, -).
             Perform(v, tr);
         } else if(IsANumberInAnyBase(word)) {
             PerformNumber(word, tr);
