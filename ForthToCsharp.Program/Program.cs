@@ -25,7 +25,7 @@ try {
 
     var input   = new StringBuilder();
     var output  = new StringBuilder();
-    var tr      = new Translator(Console.In, output);
+    var tr      = new Translator(output);
 
     System.ReadLine.HistoryEnabled = true;
 
@@ -42,10 +42,8 @@ try {
             if(lowerLine == "bye") break;
             if(lowerLine == "debug") { debug = !debug; continue;}
 
-            using var reader = new StringReader(line); // TODO: Refactor Translator API to stateless funcs.
-            tr.inputReader   = reader;
 
-            Translator.Translate(tr);
+            Translator.TranslateLine(tr, line);
             var newCode = tr.output.ToString();
 
             if(debug) WriteLine($"\n{newCode}");

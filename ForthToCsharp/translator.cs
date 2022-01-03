@@ -21,7 +21,6 @@ public class Translator {
 
     // Input and outputs.
     public StringBuilder output;
-    public TextReader inputReader;
 
     public string? line;
 
@@ -44,9 +43,8 @@ public class Translator {
     // Number of immediates in the definition;
     public int literalCount = 0;
 
-    public Translator(TextReader inputReader, StringBuilder output) {
+    public Translator(StringBuilder output) {
         this.output  = output;
-        this.inputReader = inputReader;
 
         // TODO: this is a hack. The word constructing words should set the name.
         foreach(var key in words.Keys) {
@@ -58,10 +56,7 @@ public class Translator {
 
     // I can't use an iterator returning method because CreateWord need access to the next word.
     public string? NextWord(char sep = ' ') {
-        while(string.IsNullOrWhiteSpace(line)) {
-            line = inputReader.ReadLine();
-            if(line == null) return null;
-        }
+        while(string.IsNullOrWhiteSpace(line)) return null;
 
         string word;
         line = line.Trim();
@@ -443,7 +438,8 @@ while({c}({i}, {e})) {{
         tr.Emit(ToCsharpInst("_do", $"\"{word}\""));
     }
 
-    public static void Translate(Translator tr) {
+    public static void TranslateLine(Translator tr, string line) {
+        tr.line = line;
         while(true) {
             var word = tr.NextWord();
             if(word == null) break;
@@ -453,8 +449,13 @@ while({c}({i}, {e})) {{
     }
     public static string TranslateString(string forthCode) {
         var outp = new StringBuilder();
-        var tr = new Translator(new StringReader(forthCode), outp);
-        Translate(tr);
+        var tr = new Translator(outp);
+        var reader = new StringReader(forthCode);
+        while(true) {
+            var line = reader.ReadLine();
+            if(line == null) break;
+            TranslateLine(tr, line);
+        }
         return tr.output.ToString();
     }
 

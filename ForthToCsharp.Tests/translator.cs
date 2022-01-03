@@ -9,31 +9,6 @@ using System.Collections.Generic;
 
 public class TranslatorTests
 {
-    private IEnumerable<string> InputWords(Translator tr) {
-        while(true) {
-            var s = tr.NextWord();
-            if(s == null) yield break;
-            yield return s;
-        }
-    }
-    [Theory]
-    [InlineData("10 20 +", new string[] {"10", "20", "+"})]
-    [InlineData("10 20 +\n  \n\n aa\n\nab\ncd", new string[] {"10", "20", "+", "aa", "ab", "cd"})]
-    [InlineData("", new string[] {})]
-    [InlineData("   ", new string[] {})]
-    public void CanDivideStreamIntoWords(string toDivide, string[] words) {
-        Translator tr = new(new StringReader(toDivide), null!);
-        Assert.Equal(words, InputWords(tr).ToArray());
-    }
-    /*
-    [Theory]
-    [InlineData("10 20 +", "vm.push(10);\nvm.push(20);\nplus_0\n", "")]
-    public void TranslateString(string forthCode, string interpr, string compile) {
-        var (i, c) = Translator.TranslateString(forthCode);
-        Assert.Equal(interpr, i);
-        Assert.Equal(compile, c);
-    }
-    */
     [Theory]
     [InlineData("10 20 +", 30)]
     [InlineData("1 dup dup drop drop", 1)]
