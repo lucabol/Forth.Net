@@ -60,6 +60,15 @@ void ProcessFiles(Options o, Translator tr) {
 }
 
 void CompileTo(Options o, Translator tr) {
+    StringBuilder sb = new();
+
+    var vmCode  = LoadVmCode();
+    sb.Append(vmCode);
+
+    sb.Append("public static class Forth {\n");
+    sb.Append(FlushToString(tr));
+    sb.Append("\n}");
+    File.WriteAllText(o.Output, sb.ToString());
 }
 
 async Task Interpret(Options o, Translator tr) {

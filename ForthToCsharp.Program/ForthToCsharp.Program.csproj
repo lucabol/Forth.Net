@@ -11,11 +11,11 @@
   </ItemGroup>
 
 <ItemGroup>
-  <ContentWithTargetPath Include="test.fth">
+  <ContentWithTargetPath Include="*.fth">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    <TargetPath>test.fth</TargetPath>
+    <TargetPath>*.fth</TargetPath>
   </ContentWithTargetPath>
-  <None Include="test.fth" />
+  <None Include="*.fth" />
 </ItemGroup>
 
   <PropertyGroup>
