@@ -426,12 +426,12 @@ while({c}({i}, {e})) {{
         return false;
     }
     public static void TranslateWord(string word, Translator tr) {
-        if(tr.words.TryGetValue(word, out Word v)) { // Keep symbols (i.e, +, -).
+        if(tr.words.TryGetValue(word, out Word v)) {
             Perform(v, tr);
         } else if(IsANumberInAnyBase(word)) {
             PerformNumber(word, tr);
         } else {
-            throw new Exception($"Word '{word}' not in the dictionary.");
+            throw new Exception($"The word '{word}' was not found in the dictionary.");
         }
     }
     public static void InsertDo(string word, Translator tr) {
@@ -455,7 +455,7 @@ while({c}({i}, {e})) {{
         }
     }
     public static void EmitFunctionPreamble(Translator tr, string name)
-        => tr.Emit($"static void {name}(ref Vm vm) {{\n");
+        => tr.Emit($"public static void {name}(ref Vm vm) {{\n");
     public static void EmitFunctionEnding(Translator tr)
         => tr.Emit("\n}");
     public static void EmitFunctionCall(Translator tr, string name)
@@ -554,6 +554,7 @@ static public partial class __GEN {{
             {"refill"  ,  intrinsic("refill")},
             {"word"    ,  intrinsic("word")},
             {"bl"      ,  intrinsic("bl")},
+            {"nl"      ,  intrinsic("nl")},
             {"_do"     ,  intrinsic("_do")},
             {".s"   ,  intrinsic("_dots")},
             {"dump"    ,  intrinsic("dump")},

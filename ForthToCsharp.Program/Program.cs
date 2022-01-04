@@ -26,7 +26,7 @@ Parser.Default.ParseArguments<Options>(args).WithParsed<Options>(o => {
 void ColorLine(ConsoleColor color, string s) {
     var backupcolor = ForegroundColor;
     ForegroundColor = color;
-    WriteLine(s);
+    Console.WriteLine(s);
     ForegroundColor = backupcolor;
 }
 
@@ -131,7 +131,7 @@ async Task Interpret(Options o, Translator tr) {
                 Translator.TranslateLine(tr, line);
                 var newCode = tr.output.ToString();
 
-                if(debug) WriteLine($"\n{newCode}");
+                if(debug) Console.WriteLine($"\n{newCode}");
 
                 script = await script.ContinueWithAsync(newCode).ConfigureAwait(false);
             } catch(Exception e) {

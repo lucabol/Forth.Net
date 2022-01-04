@@ -110,16 +110,23 @@ public struct Vm
 
 public static partial class VmExt
 {
-    // This slow code is not called if you define NOBASE
+    // This slow code is not called if you define NOBASE.
+    // Also the code gets here if the user insert a word that could be interpreted as an hex number.
     private static nint ConvertToBase(ref Vm vm, string s) {
         var b = basev(ref vm);
-        switch(vm.CELL_SIZE) {
-            case 1: return (nint)Convert.ToSByte(s, b);
-            case 2: return (nint)Convert.ToInt16(s, b);
-            case 4: return (nint)Convert.ToInt32(s, b);
-            case 8: return (nint)Convert.ToInt64(s, b);
+        try {
+            switch(vm.CELL_SIZE) {
+                case 1: return (nint)Convert.ToSByte(s, b);
+                case 2: return (nint)Convert.ToInt16(s, b);
+                case 4: return (nint)Convert.ToInt32(s, b);
+                case 8: return (nint)Convert.ToInt64(s, b);
+            }
+            throw new Exception($"{b} is not a valid base (supported 2, 8, 10 and 16).");
         }
-        throw new Exception($"Cannot convert {s} to base {b}.");
+        catch(Exception) {
+            throw new Exception(
+                    $"The word '{s}' was not found in the dictionary. Interpreting it as a number in base {b} failed as well.");
+        }
     }
     [RE] public static Func<nint, nint, bool> loopCond(nint s, nint e) =>
         s < e ? (i, e1) => i < e1 : (i, e1) => i >= e1;
@@ -370,10 +377,10 @@ public static partial class VmExt
         push(ref vm, vm.word);
     }
     [RE]
-    public static void bl(ref Vm vm)
-    {
-        push(ref vm, (nint)' ');
-    }
+    public static void bl(ref Vm vm) => push(ref vm, (nint)' ');
+    [RE]
+    public static void nl(ref Vm vm) => push(ref vm, (nint)'\n');
+
     [RE]public static string _dotNetString(ref Vm vm)
     {
         var c = popi(ref vm);
