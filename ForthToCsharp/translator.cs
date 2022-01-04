@@ -454,6 +454,7 @@ while({c}({i}, {e})) {{
             TranslateLine(tr, line);
         }
     }
+
     public static void EmitFunctionPreamble(Translator tr, string name)
         => tr.Emit($"public static void {name}(ref Vm vm) {{\n");
     public static void EmitFunctionEnding(Translator tr)
