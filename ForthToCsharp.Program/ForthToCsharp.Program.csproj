@@ -5,9 +5,18 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.0.1" />
     <PackageReference Include="ReadLine" Version="2.0.1" />
   </ItemGroup>
+
+<ItemGroup>
+  <ContentWithTargetPath Include="test.fth">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <TargetPath>test.fth</TargetPath>
+  </ContentWithTargetPath>
+  <None Include="test.fth" />
+</ItemGroup>
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>

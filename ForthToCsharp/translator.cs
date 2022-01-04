@@ -447,17 +447,26 @@ while({c}({i}, {e})) {{
             TranslateWord(word, tr);
         }
     }
-    public static string TranslateString(string forthCode) {
-        var outp = new StringBuilder();
-        var tr = new Translator(outp);
-        var reader = new StringReader(forthCode);
+    public static void TranslateReader(TextReader reader, Translator tr) {
         while(true) {
             var line = reader.ReadLine();
             if(line == null) break;
             TranslateLine(tr, line);
         }
-        return tr.output.ToString();
     }
+    public static void EmitFunctionPreamble(Translator tr, string name)
+        => tr.Emit($"static void {name}(ref Vm vm) {{\n");
+    public static void EmitFunctionEnding(Translator tr)
+        => tr.Emit("\n}");
+    public static void EmitFunctionCall(Translator tr, string name)
+        => tr.Emit($"{name}(ref vm);\n");
+    public static string LoadVmCode() => File.ReadAllText("../ForthToCsharp/vm.cs");
+    public static string FlushToString(Translator tr) {
+        var s = tr.output.ToString();
+        tr.output.Clear();
+        return s;
+    }
+    //var vmCode  = File.ReadAllText("../../../../ForthToCsharp/vm.cs");
 
     public static string ToCSharp(string funcName, string outp) =>
         $@"
@@ -597,6 +606,7 @@ static public partial class __GEN {{
             {"s\""  , function(SStringDef, true)},
             {"c\""  , function(CStringDef, true)},
             {"recurse"  , function(RecurseDef, true)},
+            {"bye"  , function((Word _, Translator tr) => tr.Emit("Environment.Exit(0);"), false)},
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
