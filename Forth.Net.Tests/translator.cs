@@ -22,8 +22,7 @@ public class TranslatorTests
         var csharp = Translator.ToCSharp("Run", tr.output.ToString());
         const string runExpr = "__GEN.TestRun()";
 
-        var vmCode = System.IO.File.ReadAllText("../../../../ForthToCsharp/vm.cs");
-        File.WriteAllText("../../../../ForthToCsharp.Program/out.cs.bak", vmCode + csharp);
+        var vmCode = Translator.LoadVmCode();
 
         var state  = await CSharpScript.RunAsync(vmCode + csharp + runExpr);
         //state      = await state.ContinueWithAsync(csharp);

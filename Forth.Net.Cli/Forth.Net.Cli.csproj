@@ -14,6 +14,15 @@
   <None Include="*.fth" />
 </ItemGroup>
 
+
+<ItemGroup>
+  <ContentWithTargetPath Include="vm.cs.kernel">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <TargetPath>vm.cs.kernel</TargetPath>
+  </ContentWithTargetPath>
+  <None Include="vm.cs.kernel" />
+</ItemGroup>
+
 <ItemGroup>
   <ProjectReference Include="..\Forth.Net\Forth.Net.csproj" />
 </ItemGroup>

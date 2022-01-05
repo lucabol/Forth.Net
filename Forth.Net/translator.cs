@@ -461,13 +461,13 @@ while({c}({i}, {e})) {{
         => tr.Emit("\n}");
     public static void EmitFunctionCall(Translator tr, string name)
         => tr.Emit($"{name}(ref vm);\n");
-    public static string LoadVmCode() => File.ReadAllText("../ForthToCsharp/vm.cs");
+    public static string LoadVmCode()
+        => File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vm.cs.kernel"));
     public static string FlushToString(Translator tr) {
         var s = tr.output.ToString();
         tr.output.Clear();
         return s;
     }
-    //var vmCode  = File.ReadAllText("../../../../ForthToCsharp/vm.cs");
 
     public static string ToCSharp(string funcName, string outp) =>
         $@"
