@@ -1,6 +1,6 @@
 # Forth.Net
 
-An implementation of the Forth programming language for the .Net platform. You can use it in interactively, interpret Forth files or compile Forth files to C#.
+An implementation of the [Forth](https://en.wikipedia.org/wiki/Forth_(programming_language)) programming language for the [.Net Framework](https://en.wikipedia.org/wiki/.NET_Framework). You can use it in interactively, interpret Forth files or compile Forth files to C#.
 
 ## Installation
 
