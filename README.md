@@ -20,3 +20,9 @@ nforth Test1.fth Test2.fth -e bye
 # Compile files to C#.
 nforth Test1.fth Test2.fth -o Forth.cs
 ```
+
+## Notes
+
+. The CLI is implemented by compiling the Forth code to C# and executing it interactively.
+. To see the generated C# code type `debug` at the console. That toggles the setting.
+. The tool compiles a self-sufficient C# file containing a `Forth` static class with a static function for each compiled file named as the file passed at the command line.
