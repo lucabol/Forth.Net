@@ -1,10 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-      <ProjectReference Include="..\ForthToCsharp\ForthToCsharp.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.8.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.0.1" />
     <PackageReference Include="ReadLine" Version="2.0.1" />
@@ -17,6 +13,10 @@
   </ContentWithTargetPath>
   <None Include="*.fth" />
 </ItemGroup>
+
+<ItemGroup>
+  <ProjectReference Include="..\Forth.Net\Forth.Net.csproj" />
+</ItemGroup>
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
