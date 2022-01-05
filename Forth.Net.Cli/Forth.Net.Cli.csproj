@@ -7,11 +7,20 @@
   </ItemGroup>
 
 <ItemGroup>
-  <ContentWithTargetPath Include="*.fth">
+  <ContentWithTargetPath Include="Test1.fth">
     <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    <TargetPath>*.fth</TargetPath>
+    <TargetPath>Test1.fth</TargetPath>
   </ContentWithTargetPath>
-  <None Include="*.fth" />
+  <None Include="Test1.fth" />
+</ItemGroup>
+
+
+<ItemGroup>
+  <ContentWithTargetPath Include="Test2.fth">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    <TargetPath>Test2.fth</TargetPath>
+  </ContentWithTargetPath>
+  <None Include="Test2.fth" />
 </ItemGroup>
 
 
@@ -32,6 +41,10 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>nforth</ToolCommandName>
+    <PackageOutputPath>./nupkg</PackageOutputPath>
   </PropertyGroup>
 
 </Project>
