@@ -36,6 +36,10 @@
   <ProjectReference Include="..\Forth.Net\Forth.Net.csproj" />
 </ItemGroup>
 
+  <ItemGroup>
+      <None Include="../README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net6.0</TargetFramework>
@@ -45,6 +49,11 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>nforth</ToolCommandName>
     <PackageOutputPath>./nupkg</PackageOutputPath>
+
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <VersionPrefix>1.0.3</VersionPrefix>
+    <VersionSuffix>alpha</VersionSuffix>
+
   </PropertyGroup>
 
 </Project>

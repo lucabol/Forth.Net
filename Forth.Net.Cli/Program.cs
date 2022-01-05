@@ -1,13 +1,22 @@
 ﻿using System.Text;
 using CommandLine;
+using CommandLine.Text;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using static Translator;
 
 using static System.Console;
 
 bool Verbose = false;
+bool Repl    = false;
 
-Parser.Default.ParseArguments<Options>(args).WithParsed<Options>(o => {
+var parser = new CommandLine.Parser(with => with.HelpWriter = null);
+var parserResult = parser.ParseArguments<Options>(args);
+parserResult
+    .WithParsed<Options>(options => Run(options))
+    .WithNotParsed(errs => DisplayHelp(parserResult, errs));
+
+
+void Run(Options o) {
 
     ValidateOptions(o);
 
@@ -20,8 +29,18 @@ Parser.Default.ParseArguments<Options>(args).WithParsed<Options>(o => {
         CompileTo(o, tr);
     else
         Interpret(o, tr).Wait();
-});
+}
 
+static void DisplayHelp<T>(ParserResult<T> result, IEnumerable<Error> errs)
+{
+  var helpText = HelpText.AutoBuild(result, h =>
+  {
+    h.AdditionalNewLineAfterOption = false;
+    h.Copyright = "Copyright (c) 2022 Luca Bolognese";
+    return HelpText.DefaultParsingErrorsHandler(result, h);
+  }, e => e);
+  Console.WriteLine(helpText);
+}
 
 void ColorLine(ConsoleColor color, string s) {
     var backupcolor = ForegroundColor;
@@ -60,6 +79,7 @@ void ProcessFiles(Options o, Translator tr) {
 }
 
 void CompileTo(Options o, Translator tr) {
+    Write("Compiling. Please wait ...");
     StringBuilder sb = new();
 
     var vmCode  = LoadVmCode();
@@ -69,6 +89,7 @@ void CompileTo(Options o, Translator tr) {
     sb.Append(FlushToString(tr));
     sb.Append("\n}");
     File.WriteAllText(o.Output, sb.ToString());
+    WriteLine(" done.");
 }
 
 async Task Interpret(Options o, Translator tr) {
@@ -78,12 +99,12 @@ async Task Interpret(Options o, Translator tr) {
     var globals = new Globals { input = Console.In, output = Console.Out };
     var vmnew   = "var vm = new Vm(input, output);";
 
-    var repl = o.Exec == null;
+    Repl = o.Exec == null;
 
-    if(repl) Console.Write("Initializing. Please wait ..."); else Write("Initializing. Please wait ...");
+    Write("Initializing. Please wait ...");
     var script = await CSharpScript.RunAsync(vmCode, globals: globals).ConfigureAwait(false);
     script     = await script.ContinueWithAsync(vmnew).ConfigureAwait(false);
-    if(repl) Console.WriteLine(" done."); else WriteLine(" done.");
+    WriteLine(" done.");
 
     var filesCode = FlushToString(tr);
     if(!string.IsNullOrWhiteSpace(filesCode)) {
@@ -145,8 +166,8 @@ async Task Interpret(Options o, Translator tr) {
     }
 }
 
-void Write(string s) { if(Verbose) Console.Write(s);}
-void WriteLine(string s) { if(Verbose) Console.WriteLine(s);}
+void Write(string s) { if(Verbose || Repl) Console.Write(s);}
+void WriteLine(string s) { if(Verbose || Repl) Console.WriteLine(s);}
 
 public class Options {
     [Option('e', "exec", Required = false, HelpText = "Execute the code in the Forth files and append this instruction at the ned.")]
