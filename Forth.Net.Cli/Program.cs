@@ -12,8 +12,8 @@ bool Repl    = false;
 var parser = new CommandLine.Parser(with => with.HelpWriter = null);
 var parserResult = parser.ParseArguments<Options>(args);
 parserResult
-    .WithParsed<Options>(options => Run(options))
-    .WithNotParsed(errs => DisplayHelp(parserResult, errs));
+.WithParsed<Options>(options => Run(options))
+.WithNotParsed(errs => DisplayHelp(parserResult, errs));
 
 
 void Run(Options o) {
@@ -36,9 +36,12 @@ static void DisplayHelp<T>(ParserResult<T> result, IEnumerable<Error> errs)
   var helpText = HelpText.AutoBuild(result, h =>
   {
     h.AdditionalNewLineAfterOption = false;
-    h.Copyright = "Copyright (c) 2022 Luca Bolognese";
+    h.AddPreOptionsLine("Usage: nforth [Forth files] [Options]");
+    h.AddPostOptionsText
+        ("EXAMPLES:\n\tnforth\n\tnforth Test1.fth Test2.fth -e bye\n\tnforth Test1.fth Test2.fth -o Forth.cs");
     return HelpText.DefaultParsingErrorsHandler(result, h);
   }, e => e);
+
   Console.WriteLine(helpText);
 }
 
@@ -94,14 +97,15 @@ void CompileTo(Options o, Translator tr) {
 
 async Task Interpret(Options o, Translator tr) {
 
+    Repl = o.Exec == null;
+    Write("Initializing. Please wait ...");
+
     var vmCode  = LoadVmCode();
 
     var globals = new Globals { input = Console.In, output = Console.Out };
     var vmnew   = "var vm = new Vm(input, output);";
 
-    Repl = o.Exec == null;
 
-    Write("Initializing. Please wait ...");
     var script = await CSharpScript.RunAsync(vmCode, globals: globals).ConfigureAwait(false);
     script     = await script.ContinueWithAsync(vmnew).ConfigureAwait(false);
     WriteLine(" done.");
@@ -170,13 +174,13 @@ void Write(string s) { if(Verbose || Repl) Console.Write(s);}
 void WriteLine(string s) { if(Verbose || Repl) Console.WriteLine(s);}
 
 public class Options {
-    [Option('e', "exec", Required = false, HelpText = "Execute the code in the Forth files and append this instruction at the ned.")]
+    [Option('e', "exec [forthstring]", Required = false, HelpText = "Execute forthstring after starting up.")]
     public string? Exec {get; set;}
 
-    [Option('o', "output", Required = false, HelpText = "Compile C# code to this file.")]
+    [Option('o', "output [csfile]", Required = false, HelpText = "Compile code in the Forth files to csfile.")]
     public string? Output {get; set;}
 
-    [Value(1, HelpText = "Forth files to compile or execute.")]
+    [Value(0, MetaName="Forth files", HelpText = "Optional Forth files to compile or execute.")]
     public IEnumerable<string>? Files {get; set;}
 
     [Option('v', "verbose", Required = false, HelpText = "Produce verbose output.")]

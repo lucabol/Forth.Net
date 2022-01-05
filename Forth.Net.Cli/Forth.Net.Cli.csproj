@@ -49,10 +49,12 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>nforth</ToolCommandName>
     <PackageOutputPath>./nupkg</PackageOutputPath>
-
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <VersionPrefix>1.0.3</VersionPrefix>
-    <VersionSuffix>alpha</VersionSuffix>
+    <Description>Forth for .Net (CLI, Interpret and compiler to C#)</Description>
+    <Copyright>2020 Ⓒ Luca Bolognese </Copyright>
+    <Authors>Luca Bolognese</Authors>
+    <VersionPrefix>1.0.4</VersionPrefix>
 
   </PropertyGroup>
 
