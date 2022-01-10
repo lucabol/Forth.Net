@@ -576,7 +576,6 @@ static public partial class __GEN {{
             {"_labelHere"      ,  intrinsic("_labelHere")},
             {"key"      ,  intrinsic("_key")},
 
-            {"create" , function(CreateDef    , false)} ,
             {"variable" , function(CreateDef    , false)} ,
 #if FASTCONSTANT
             {"constant" , function(ConstantDef    , false)} ,
@@ -584,8 +583,9 @@ static public partial class __GEN {{
             {"constant" , function(ConstantDef1    , false)} ,
 #endif
             {":"      , function(ColonDef     , false)} ,
-            {";"      , function(SemiColonDef , true)}  ,
+            {"create" , function(CreateDef    , false)} ,
             {"does>"  , function(DoesDef      , true)}  ,
+            {";"      , function(SemiColonDef , true)}  ,
             {"("  , function(CommentP      , true)}  ,
             {"\\"  , function(CommentS      , true)}  ,
             {"do"  , function(DoDef      , false)}  ,
