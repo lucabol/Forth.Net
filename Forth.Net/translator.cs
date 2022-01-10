@@ -9,12 +9,12 @@ using System.Diagnostics.CodeAnalysis;
 
 public delegate void Definition(Word w, Translator tr);
 
-public struct Word {
-    public Definition def;
+public class Word {
+    public Definition? def;
     public bool       immediate;
     public bool       export;
     public bool       tickdefined;
-    public string     name;
+    public string?     name;
 }
 
 public class Translator {
@@ -29,9 +29,12 @@ public class Translator {
     public string lastWord    = "";
     public string lastCreated = "";
 
+    // Actions for a word definition starting with :
     List<Word>? defActions;
-    List<Word>? doesActions;
+    // Actions for each word to add their behavior to. It can be defActions or does> actions.
     List<Word>? actions;
+    // Calls to recurse inside a colon definition.
+    List<Word>? recurseActions;
 
     // Iteration count for for loops.
     public int nested = 0;
@@ -47,11 +50,8 @@ public class Translator {
         this.output  = output;
 
         // TODO: this is a hack. The word constructing words should set the name.
-        foreach(var key in words.Keys) {
-            var w = words[key];
-            w.name = key;
-            words[key] = w;
-        }
+        foreach(var (key, value) in words)
+            value.name = key;
     }
 
     // I can't use an iterator returning method because CreateWord need access to the next word.
@@ -87,6 +87,7 @@ public class Translator {
     public void Emit(string s) => output.AppendLine(s);
 
     private static void ExecuteDef(Word w, Translator tr) {
+        if(w.def == null) throw new Exception("Trying to execute a word with a null definition.");
         w.def(w, tr);
     }
     public static void CompileOrEmit(Word w, Translator tr) {
@@ -116,10 +117,10 @@ public class Translator {
     public static void ColonDef(Word w, Translator tr) {
         var s = NextWordLower(w, tr);
 
-        tr.lastWord    = s;
-        tr.defActions  = new();
-        tr.doesActions = null;
-        tr.actions     = tr.defActions;
+        tr.lastWord   = s;
+        tr.defActions = new();
+        tr.recurseActions = new();
+        tr.actions    = tr.defActions;
 
         tr.Emit(ToCsharpInst("_labelHere", $"\"{s}\""));
 
@@ -137,21 +138,24 @@ public class Translator {
     }
     public static void DoesDef(Word w, Translator tr) {
         // Encountering does> finishes the definition of the word and starts the definition of does.
-        tr.doesActions = new();
-        tr.actions = tr.doesActions;
-        tr.doesActions.Add(
+        List<Word> doesActions = new();
+
+       doesActions.Add(
                 function((Word w, Translator tr1) => // tr1 is at time of does> execution.
                     tr1.Emit(ToCsharpInst("_pushLabel", $"\"{tr1.lastCreated}\"")), false));
+
+
+       if(tr.actions == null) throw new Exception("does> outside a definition perhaps?");
+
+       tr.actions.Add(function((Word w, Translator tr1) =>
+                    tr1.words[tr1.lastCreated] = new Word { immediate = false,
+                    export = false, def = ExecuteWords(doesActions) }, false));
+
+       tr.actions = doesActions;
     }
     public static void SemiColonDef(Word w, Translator tr) {
         if(tr.defActions == null) throw new Exception("Semicolon (;) seen in interpret mode");
 
-         // Gnarly. At creation (i.e. 10 array ar) attach the words from does> part of : array to
-         // the dictionary word for ar.
-        if(tr.doesActions != null)
-            tr.defActions.Add(function((Word w, Translator tr1) =>
-                        tr1.words[tr1.lastCreated] = new Word { immediate = false,
-                        export = false, def = ExecuteWords(tr.doesActions) }, false));
 
         var wordName = tr.lastWord;
 
@@ -200,9 +204,11 @@ public class Translator {
     public static void RegisterTick(Word w, Translator tr, string funcName) {
             tr.Emit($"vm.xts[vm.xtsp] = {funcName};vm.wordToXts[\"{w.name}\"] = vm.xtsp; vm.xtsp++;");
             w.tickdefined = true;
+
+            if(w.name == null) throw new Exception("Trying to tick a word without a name");
             tr.words[w.name] = w;
     }
-    // TODO; refactor away repetition in the next two functions.
+
     public static void TickDef(Word w, Translator tr) {
         var s = NextWordLower(w, tr);
         var funcName = ToCsharpId(s);
@@ -221,32 +227,34 @@ public class Translator {
             tr.Emit(op);
     }
     public static void immediateDef(Word w, Translator tr) {
-        var word = tr.words[tr.lastWord];
-        word.immediate = true;
-        tr.words[tr.lastWord] = word;
+        var word = tr.words[tr.lastWord].immediate = true;
     }
 
     public static void RecurseSubst(Translator tr, ref Word word) {
-        if(tr.defActions == null) throw new Exception("Semicolon outside a definition perhaps?");
+        if(tr.recurseActions == null) throw new Exception("Semicolon outside a definition perhaps?");
+        if(word.name == null) throw new Exception("Trying to recurse a word without a name");
 
         var funcName = ToCsharpId(word.name);
 
-        var actionsWithRecurse = tr.doesActions == null ?
-            new List<Word>[] { tr.defActions} :
-            new List<Word>[] { tr.defActions, tr.doesActions } ;
+        var isRecurse = tr.recurseActions.Count() != 0;
+        var actions = tr.recurseActions;
 
-        var isRecurse = false;
-        foreach(var actions in actionsWithRecurse)
-            for(int i = 0; i < actions.Count; i++)
-                if(actions[i].name == "recurse") {
-                    actions[i] = verbatim($"{funcName}(ref vm);");
-                    isRecurse = true;
-                }
+        foreach(var a in tr.recurseActions) {
+            a.immediate = word.immediate; a.export = word.export; a.tickdefined = true;
+            a.def = (word, tr) => {
+                tr.Emit($"{funcName}(ref vm);");
+            };
+        }
         if(isRecurse) EmitFunc(word, tr, funcName);
     }
     public static void RecurseDef(Word w, Translator tr) {
         if(tr.actions == null) throw new Exception("Null actions while processing 'recurse'");
-        tr.actions.Add(new Word { name = "recurse" });
+        if(tr.recurseActions == null) throw new Exception("Null recurse actions while processing 'recurse'");
+
+        var recurseAction = new Word { name = "recurse" };
+
+        tr.actions.Add(recurseAction);
+        tr.recurseActions.Add(recurseAction);
     }
     public static void CStringDef(Word w, Translator tr) {
         var s = tr.NextWord('"');
@@ -321,12 +329,10 @@ while({c}({i}, {e})) {{
     }
 
     public static void IDef(Word w, Translator tr) {
-        
         var i = $"___i{tr.nested}";
         tr.Emit($"VmExt.push(ref vm, {i});");
     }
     public static void JDef(Word w, Translator tr) {
-        
         var i = $"___i{tr.nested - 1}";
         tr.Emit($"VmExt.push(ref vm, {i});");
     }
@@ -426,7 +432,8 @@ while({c}({i}, {e})) {{
         return false;
     }
     public static void TranslateWord(string word, Translator tr) {
-        if(tr.words.TryGetValue(word, out Word v)) {
+        word = word.ToLowerInvariant();
+        if(tr.words.TryGetValue(word, out Word? v)) {
             Perform(v, tr);
         } else if(IsANumberInAnyBase(word)) {
             PerformNumber(word, tr);
