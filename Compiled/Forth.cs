@@ -91,7 +91,6 @@ public struct Vm
 
         pad = here_p;
         here_p += pad_max;
-
         this.source_max_chars = source_max_chars;
         this.word_max_chars = word_max_chars;
 
@@ -281,6 +280,9 @@ public static partial class VmExt
     }
 
     [RE]
+    public static void inpp(ref Vm vm) => push(ref vm, vm.inp);
+
+    [RE]
     public static void source(ref Vm vm)
     {
         push(ref vm, vm.source);
@@ -467,6 +469,32 @@ vm.output.WriteLine("The value of test is ");
 VmExt._dot(ref vm);;
 
 }
+VmExt._labelHere(ref vm, "lat");
+VmExt._labelHere(ref vm, "flat");
+do {
+
+vm.output.WriteLine("<<bar>>");
+VmExt.inpp(ref vm);
+VmExt.dup(ref vm);
+VmExt._fetch(ref vm);
+VmExt.pushs(ref vm, "3");
+{
+var a = VmExt.pop(ref vm);
+var b = VmExt.pop(ref vm);
+var c = b - a;
+VmExt.push(ref vm, c);
+
+}
+{
+var a = VmExt.pop(ref vm);
+var b = VmExt.pop(ref vm);
+VmExt.push(ref vm, a);
+VmExt.push(ref vm, b);
+
+}
+VmExt._store(ref vm);
+} while(false);
+
 vm.output.WriteLine("Done.");
 
 }

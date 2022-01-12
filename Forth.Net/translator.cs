@@ -582,6 +582,7 @@ static public partial class __GEN {{
 
             {"_labelHere"      ,  intrinsic("_labelHere")},
             {"key"      ,  intrinsic("_key")},
+            {">in"      ,  intrinsic("inpp")},
 
             {"variable" , function(CreateDef    , false)} ,
 #if FASTCONSTANT

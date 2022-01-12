@@ -91,7 +91,6 @@ public struct Vm
 
         pad = here_p;
         here_p += pad_max;
-
         this.source_max_chars = source_max_chars;
         this.word_max_chars = word_max_chars;
 
@@ -279,6 +278,9 @@ public static partial class VmExt
         vm.output.Write(chars.ToString());
         vm.output.WriteLine();
     }
+
+    [RE]
+    public static void inpp(ref Vm vm) => push(ref vm, vm.inp);
 
     [RE]
     public static void source(ref Vm vm)
