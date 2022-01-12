@@ -616,7 +616,7 @@ static public partial class __GEN {{
             {"s\""  , function(SStringDef, true)},
             {"c\""  , function(CStringDef, true)},
             {"recurse"  , function(RecurseDef, true)},
-            {"bye"  , function((Word _, Translator tr) => tr.Emit("Environment.Exit(0);"), false)},
+            {"bye"  , function((Word _, Translator tr) => tr.Emit("System.Environment.Exit(0);"), false)},
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},

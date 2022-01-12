@@ -2,6 +2,8 @@
 using CommandLine;
 using CommandLine.Text;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
+using System.Reflection;
 using static Translator;
 
 using static System.Console;
@@ -102,12 +104,13 @@ async Task Interpret(Options o, Translator tr) {
 
     var vmCode  = LoadVmCode();
 
-    var globals = new Globals { input = Console.In, output = Console.Out };
-    var vmnew   = "var vm = new Vm(input, output);";
+    var globals = new Globals { vm = new Vm("TestXXX", Console.In, Console.Out) };
 
-
-    var script = await CSharpScript.RunAsync(vmCode, globals: globals).ConfigureAwait(false);
-    script     = await script.ContinueWithAsync(vmnew).ConfigureAwait(false);
+    var script = await CSharpScript.RunAsync(
+            "",
+            ScriptOptions.Default.WithReferences(new Assembly[] {
+                typeof(Globals).Assembly, typeof(Environment).Assembly}),
+            globals: globals).ConfigureAwait(false);
     WriteLine(" done.");
 
     var filesCode = FlushToString(tr);
@@ -152,8 +155,19 @@ async Task Interpret(Options o, Translator tr) {
 
                 if(lowerLine == "debug") { debug = !debug; continue;}
 
+                // We already checked that line is not null above. Hence we can avoid chekcing
+                // the result of refill.
+                globals.vm.inputBuffer = line;
+                script = await script.ContinueWithAsync("VmExt.refill(ref vm);VmExt.drop(ref vm);");
 
-                Translator.TranslateLine(tr, line);
+                while(true) {
+                    script = await script.ContinueWithAsync("VmExt.nextword(ref vm)");
+                    var word = (string)script.ReturnValue;
+
+                    if(string.IsNullOrWhiteSpace(word)) break;
+
+                    Translator.TranslateWord(word, tr);
+                }
                 var newCode = tr.output.ToString();
 
                 if(debug) Console.WriteLine($"\n{newCode}");
@@ -187,7 +201,7 @@ public class Options {
     public bool Verbose {get; set;} = false;
 }
 
-public class Globals { public TextReader? input; public TextWriter? output; }
+public class Globals {public Vm vm;}
 
 class AutoCompletionHandler : IAutoCompleteHandler
 {

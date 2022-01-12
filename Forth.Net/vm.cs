@@ -41,6 +41,8 @@ public struct Vm
     public Dictionary<string, int> words = new();
 
     // Input/output buffer management.
+    public string inputBuffer;
+
     public TextWriter output;
     public TextReader input;
     public int source;
@@ -63,7 +65,8 @@ public struct Vm
     // Base management.
     public int base_p;
 
-    public Vm(TextReader input,
+    public Vm(string inputBuffer,
+              TextReader input,
               TextWriter output,
               int ps_max_cells = 64,
               int ds_max_bytes = 64 * 16 * 1_024,
@@ -81,6 +84,7 @@ public struct Vm
         rs = new nint[rs_max_cells * CELL_SIZE];
 
         xts = new ActionRef<Vm>[xts_max];
+        this.inputBuffer = inputBuffer;
         this.input = input;
         this.output = output;
 
@@ -330,7 +334,7 @@ public static partial class VmExt
     [RE]
     public static void refill(ref Vm vm)
     {
-        var s = vm.input.ReadLine();
+        var s = vm.inputBuffer;
         if (s == null)
         {
             push(ref vm, Vm.FALSE);
@@ -355,7 +359,7 @@ public static partial class VmExt
         var s = ToChars(ref vm, vm.source, vm.input_len_chars);
         var w = ToChars(ref vm, vm.word, vm.word_max_chars);
 
-        var j = 1; // It is a counted string, the first 2 bytes conains the length
+        var j = 1; // It is a counted string, the first 2 bytes contains the length
 
         while (vm.inp < vm.input_len_chars && s[vm.inp] == delim) { vm.inp++; }
 
@@ -367,16 +371,25 @@ public static partial class VmExt
             return;
         }
 
-        // Here i is the index to the first non-delim char, j indexes into the word buffer.
+        // Copy chars until end of space allocated, end of buffer or delim.
         while (j < vm.word_max_chars && vm.inp < vm.input_len_chars && s[vm.inp] != delim)
         {
             var c = s[vm.inp++];
             w[j++] = c;
         }
-        if (j >= vm.input_len_chars) throw new Exception($"Word longer than {vm.input_len_chars}: {s}");
+        if (j >= vm.word_max_chars) throw new Exception($"Word longer than {vm.word_max_chars}: {s}");
 
         w[0] = (char)(j - 1);  // len goes into the first char
         push(ref vm, vm.word);
+    }
+    [RE]
+    public static string nextword(ref Vm vm, char delim = ' ')
+    {
+        push(ref vm, delim);
+        word(ref vm);
+        count(ref vm);
+        var s = _dotNetString(ref vm);
+        return s;
     }
     [RE]
     public static void bl(ref Vm vm) => push(ref vm, (nint)' ');
