@@ -22,8 +22,6 @@ public class Translator {
     // Input and outputs.
     public StringBuilder output;
 
-    public string? line;
-
     // Manage definition words.
     public bool InDefinition  = false;
     public string lastWord    = "";
@@ -46,33 +44,28 @@ public class Translator {
     // Number of immediates in the definition;
     public int literalCount = 0;
 
-    public Translator(StringBuilder output) {
-        this.output  = output;
+    // The input buffer needs to be accessible at run time (aka from a running Forth vm).
+    // Insted of passing the vm in, we generalize a little by passing callbacks.
+    public Action<string> setLine;
+    public Func<char, string> getNextWord;
+
+    public Translator(StringBuilder output, Action<string> setLine, Func<char, string> getNextWord) {
+        this.output      = output;
+        this.setLine     = setLine;
+        this.getNextWord = getNextWord;
 
         // TODO: this is a hack. The word constructing words should set the name.
         foreach(var (key, value) in words)
             value.name = key;
     }
 
-    // I can't use an iterator returning method because CreateWord need access to the next word.
     public string? NextWord(char sep = ' ') {
-        while(string.IsNullOrWhiteSpace(line)) return null;
-
-        string word;
-        line = line.Trim();
-        var index = line.IndexOf(sep);
-        if(index == -1) {
-            word = line;
-            line = null;
-            return word;
-        }
-
-        word = line.Substring(0, index);
-        line = line.Substring(index + 1);
-        return word;
+        var s = this.getNextWord(sep);
+        if(string.IsNullOrWhiteSpace(s)) return null;
+        return s;
     }
 
-    public void Reset() { line = null; InDefinition = false; nested = 0;}
+    public void Reset() {  InDefinition = false; nested = 0;}
 
     public static void CommentP(Word w, Translator tr) {
         string? word;
@@ -81,7 +74,10 @@ public class Translator {
         } while(word != null && word != ")");
     }
     public static void CommentS(Word w, Translator tr) {
-        tr.line = "";
+        string? word;
+        do {
+            word = tr.NextWord();
+        } while(word != null);
     }
 
     public void Emit(string s) => output.AppendLine(s);
@@ -446,7 +442,8 @@ while({c}({i}, {e})) {{
     }
 
     public static void TranslateLine(Translator tr, string line) {
-        tr.line = line;
+        tr.setLine(line);
+
         while(true) {
             var word = tr.NextWord();
             if(word == null) break;

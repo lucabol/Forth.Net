@@ -8,10 +8,21 @@ using static Translator;
 
 using static System.Console;
 
+// Nice fat global variables to simplify code. It is unlikely this will go multithread.
 bool Verbose = false;
 bool Repl    = false;
+Vm vm        = new Vm("TestXXX", Console.In, Console.Out);
 
-var parser = new CommandLine.Parser(with => with.HelpWriter = null);
+ScriptState<object>? script = null;
+
+Action<string> setLine = line => {
+    vm.inputBuffer = line;
+    VmExt.refill(ref vm);
+    VmExt.drop(ref vm);
+};
+Func<char, string> getNextWord = c => VmExt.nextword(ref vm);
+
+var parser       = new CommandLine.Parser(with => with.HelpWriter = null);
 var parserResult = parser.ParseArguments<Options>(args);
 parserResult
 .WithParsed<Options>(options => Run(options))
@@ -23,7 +34,7 @@ void Run(Options o) {
     ValidateOptions(o);
 
     StringBuilder sb = new();
-    Translator tr = new(sb);
+    Translator tr = new(sb, setLine, getNextWord);
 
     ProcessFiles(o, tr);
 
@@ -99,19 +110,9 @@ void CompileTo(Options o, Translator tr) {
 
 async Task Interpret(Options o, Translator tr) {
 
-    Repl = o.Exec == null;
-    Write("Initializing. Please wait ...");
+    await InitEngine(o);
 
-    var vmCode  = LoadVmCode();
-
-    var globals = new Globals { vm = new Vm("TestXXX", Console.In, Console.Out) };
-
-    var script = await CSharpScript.RunAsync(
-            "",
-            ScriptOptions.Default.WithReferences(new Assembly[] {
-                typeof(Globals).Assembly, typeof(Environment).Assembly}),
-            globals: globals).ConfigureAwait(false);
-    WriteLine(" done.");
+    if(script == null) throw new Exception("InitEngine not called");
 
     var filesCode = FlushToString(tr);
     if(!string.IsNullOrWhiteSpace(filesCode)) {
@@ -151,23 +152,13 @@ async Task Interpret(Options o, Translator tr) {
 
                 var line = System.ReadLine.Read("");
                 if(line == null) break;
+
                 var lowerLine = line.Trim().ToLowerInvariant();
 
                 if(lowerLine == "debug") { debug = !debug; continue;}
 
-                // We already checked that line is not null above. Hence we can avoid chekcing
-                // the result of refill.
-                globals.vm.inputBuffer = line;
-                script = await script.ContinueWithAsync("VmExt.refill(ref vm);VmExt.drop(ref vm);");
+                TranslateLine(tr, line);
 
-                while(true) {
-                    script = await script.ContinueWithAsync("VmExt.nextword(ref vm)");
-                    var word = (string)script.ReturnValue;
-
-                    if(string.IsNullOrWhiteSpace(word)) break;
-
-                    Translator.TranslateWord(word, tr);
-                }
                 var newCode = tr.output.ToString();
 
                 if(debug) Console.WriteLine($"\n{newCode}");
@@ -182,6 +173,21 @@ async Task Interpret(Options o, Translator tr) {
     } finally {
         ResetColor();
     }
+}
+
+async Task InitEngine(Options o) {
+
+    Repl = o.Exec == null;
+    Write("Initializing. Please wait ...");
+
+    var globals = new Globals { vm = vm };
+
+    script = await CSharpScript.RunAsync(
+            "",
+            ScriptOptions.Default.WithReferences(new Assembly[] {
+                typeof(Globals).Assembly, typeof(Environment).Assembly}),
+            globals: globals).ConfigureAwait(false);
+    WriteLine(" done.");
 }
 
 void Write(string s) { if(Verbose || Repl) Console.Write(s);}
