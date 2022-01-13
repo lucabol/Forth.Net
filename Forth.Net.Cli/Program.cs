@@ -15,14 +15,18 @@ Vm vm        = new Vm("TestXXX", Console.In, Console.Out);
 
 ScriptState<object>? script = null;
 
+// Operating on the vm variable directly, without groing through the script object
+// introduces bizarre problems, where the state of the vm changes randomly.
+// Took forever to debug. Hence the inelegant functions below.
 Action<string> setLine = line => {
     if(script == null) throw new Exception("Script cannot be null");
-    script = script.ContinueWithAsync($"vm.inputBuffer = \"{EscapeString(line)}\";").Result;
+    var s = EscapeString(line);
+    script = script.ContinueWithAsync($"vm.inputBuffer = \"{s}\";").Result;
     script = script.ContinueWithAsync("VmExt.refill(ref vm);VmExt.drop(ref vm);").Result;
 };
 Func<char, string> getNextWord = c => {
     if(script == null) throw new Exception("Script cannot be null");
-    script = script.ContinueWithAsync($"VmExt.nextword(ref vm, '{c}')").Result;
+    script = script.ContinueWithAsync($"return VmExt.nextword(ref vm, '{c}');").Result;
     return (string)script.ReturnValue;
 };
 
@@ -181,10 +185,11 @@ async Task Interpret(Options o, Translator tr) {
 
 string EscapeString(string str) {
     
-    var s = str.Replace("\"", "\\\"");
+    var s = str;
+    s = s.Replace("\\", "\\\\");
+    s = s.Replace("\"", "\\\"");
     s = s.Replace("{", "{{");
     s = s.Replace("}", "}}");
-    s = s.Replace("\\", "\\\\");
     return s;
 }
 async Task InitEngine(Options o) {
