@@ -16,11 +16,15 @@ Vm vm        = new Vm("TestXXX", Console.In, Console.Out);
 ScriptState<object>? script = null;
 
 Action<string> setLine = line => {
-    vm.inputBuffer = line;
-    VmExt.refill(ref vm);
-    VmExt.drop(ref vm);
+    if(script == null) throw new Exception("Script cannot be null");
+    script = script.ContinueWithAsync($"vm.inputBuffer = \"{EscapeString(line)}\";").Result;
+    script = script.ContinueWithAsync("VmExt.refill(ref vm);VmExt.drop(ref vm);").Result;
 };
-Func<char, string> getNextWord = c => VmExt.nextword(ref vm);
+Func<char, string> getNextWord = c => {
+    if(script == null) throw new Exception("Script cannot be null");
+    script = script.ContinueWithAsync($"VmExt.nextword(ref vm, '{c}')").Result;
+    return (string)script.ReturnValue;
+};
 
 var parser       = new CommandLine.Parser(with => with.HelpWriter = null);
 var parserResult = parser.ParseArguments<Options>(args);
@@ -175,6 +179,14 @@ async Task Interpret(Options o, Translator tr) {
     }
 }
 
+string EscapeString(string str) {
+    
+    var s = str.Replace("\"", "\\\"");
+    s = s.Replace("{", "{{");
+    s = s.Replace("}", "}}");
+    s = s.Replace("\\", "\\\\");
+    return s;
+}
 async Task InitEngine(Options o) {
 
     Repl = o.Exec == null;
