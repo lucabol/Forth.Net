@@ -40,13 +40,14 @@ public struct Vm
     // Data space index of a word.
     public Dictionary<string, int> words = new();
 
-    // Explicit input buffer.
-    public TextReader inputBuffer;
-
     // Input/output buffer management.
+    public string inputBuffer = "";
+
     public TextWriter output;
     public TextReader input;
     public int source;
+    public int keyWord;
+
     public int word;
 
     public int inp = 0;
@@ -66,7 +67,7 @@ public struct Vm
     // Base management.
     public int base_p;
 
-    public Vm(TextReader inputBuffer,
+    public Vm(
               TextReader input,
               TextWriter output,
               int ps_max_cells = 64,
@@ -85,14 +86,16 @@ public struct Vm
         rs = new nint[rs_max_cells * CELL_SIZE];
 
         xts = new ActionRef<Vm>[xts_max];
-        this.inputBuffer = inputBuffer;
         this.input = input;
         this.output = output;
 
-        word = here_p;
+        keyWord = here_p;
         here_p += word_max_chars * CHAR_SIZE;
         source = here_p;
         here_p += source_max_chars * CHAR_SIZE;
+
+        word = here_p;
+        here_p += word_max_chars * CHAR_SIZE;
 
         pad = here_p;
         here_p += pad_max;
@@ -235,7 +238,7 @@ public static partial class VmExt
     public static void allot(ref Vm vm)
     {
         var n = popi(ref vm);
-        vm.here_p = vm.here_p + n;
+        vm.here_p += n;
     }
     private static int _align(int n, int alignment) => (n + (alignment - 1)) & ~(alignment - 1);
     [RE] public static void align(ref Vm vm) => vm.here_p = _align(vm.here_p, vm.CELL_SIZE);
@@ -335,7 +338,7 @@ public static partial class VmExt
     [RE]
     public static void refill(ref Vm vm)
     {
-        var s = vm.inputBuffer.ReadLine();
+        var s = vm.inputBuffer;
         if (s == null)
         {
             push(ref vm, Vm.FALSE);
@@ -354,35 +357,47 @@ public static partial class VmExt
         }
     }
     [RE]
-    public static void word(ref Vm vm)
+    public static void word(ref Vm vm, bool inKeyword = false)
     {
         var delim = (char)pop(ref vm);
         var s = ToChars(ref vm, vm.source, vm.input_len_chars);
-        var w = ToChars(ref vm, vm.word, vm.word_max_chars);
+        var toPtr = inKeyword ? vm.keyWord : vm.word;
 
-        // Skip initial delimiters. Points to the first not delim or end of buffer.
+        var w = ToChars(ref vm, toPtr, vm.word_max_chars);
+
+        var j = 1; // It is a counted string, the first 2 bytes contains the length
+
         while (vm.inp < vm.input_len_chars && s[vm.inp] == delim) { vm.inp++; }
 
         // If all spaces to the end of the input, return a string with length 0. 
         if (vm.inp >= vm.input_len_chars)
         {
             w[0] = (char)0;
-            push(ref vm, vm.word);
+            push(ref vm, toPtr);
             return;
         }
 
-        var j = 1; // It is a counted string, the first 2 bytes contain the length
-
-        // Copy until until end of allocated space, and of buffer or delimiter.
+        // Copy chars until end of space allocated, end of buffer or delim.
         while (j < vm.word_max_chars && vm.inp < vm.input_len_chars && s[vm.inp] != delim)
         {
             var c = s[vm.inp++];
             w[j++] = c;
         }
+        // Points past the delimiter. Otherwise it would stay on last " of a string.
+        vm.inp++;
         if (j >= vm.word_max_chars) throw new Exception($"Word longer than {vm.word_max_chars}: {s}");
 
         w[0] = (char)(j - 1);  // len goes into the first char
-        push(ref vm, vm.word);
+        push(ref vm, toPtr);
+    }
+    [RE]
+    public static string nextword(ref Vm vm, char delim = ' ')
+    {
+        push(ref vm, delim);
+        word(ref vm, inKeyword: true);
+        count(ref vm);
+        var s = _dotNetString(ref vm);
+        return s;
     }
     [RE]
     public static void bl(ref Vm vm) => push(ref vm, (nint)' ');

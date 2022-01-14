@@ -11,7 +11,7 @@ using static System.Console;
 // Nice fat global variables to simplify code. It is unlikely this will go multithread.
 bool Verbose = false;
 bool Repl    = false;
-Vm vm        = new("TestXXX", Console.In, Console.Out);
+Vm vm        = new(Console.In, Console.Out);
 
 ScriptState<object>? script = null;
 
@@ -40,6 +40,10 @@ parserResult
 void Run(Options o) {
 
     ValidateOptions(o);
+
+    InitEngine(o);
+
+    if(script == null) throw new Exception("InitEngine failed.");
 
     StringBuilder sb = new();
     Translator tr = new(sb, setLine, getNextWord);
@@ -91,7 +95,7 @@ void ProcessFiles(Options o, Translator tr) {
 
     foreach(var (name, reader) in files) {
         EmitFunctionPreamble(tr, name);
-        TranslateReader(reader, tr);
+        ProcessReader(reader, tr);
         EmitFunctionEnding(tr);
     }
     if(files.Any()) {
@@ -116,22 +120,31 @@ void CompileTo(Options o, Translator tr) {
     WriteLine(" done.");
 }
 
-void TranslateLine(Translator tr, string line) {
-    tr.setLine(line);
+void ProcessReader(TextReader reader, Translator tr) {
 
     while(true) {
-        var word = tr.NextWord();
-        if(word == null) break;
 
-        TranslateWord(word, tr);
+            var line = reader.ReadLine();
+            if(line == null) break;
+
+            tr.setLine(line);
+
+            while(true) {
+                var word = tr.NextWord();
+                if(word == null) break;
+
+                TranslateWord(word, tr);
+
+                //var newCode = tr.output.ToString();
+
+                //script = script.ContinueWithAsync(newCode).Result;
+            }
     }
 }
+
 async Task Interpret(Options o, Translator tr) {
 
-    await InitEngine(o);
-
-    if(script == null) throw new Exception("InitEngine not called");
-
+    /*
     var filesCode = FlushToString(tr);
     if(!string.IsNullOrWhiteSpace(filesCode)) {
         Write("Interpreting Forth Files. Please wait ...");
@@ -139,7 +152,7 @@ async Task Interpret(Options o, Translator tr) {
         script     = await script.ContinueWithAsync("RunAll(ref vm);");
         WriteLine(" done.");
     }
-
+    */
     if(o.Exec != null) {
         Write("Interpreting Exec instruction. Please wait ...");
         TranslateLine(tr, o.Exec);
@@ -156,9 +169,6 @@ async Task Interpret(Options o, Translator tr) {
         WriteLine("Say 'bye' to exit. No output means all good.");
 
         var debug     = false;
-
-        var input   = new StringBuilder();
-        var output  = new StringBuilder();
 
         System.ReadLine.HistoryEnabled = true;
 
@@ -210,18 +220,18 @@ string EscapeString(string str) {
     s = s.Replace("}", "}}");
     return s;
 }
-async Task InitEngine(Options o) {
+void InitEngine(Options o) {
 
     Repl = o.Exec == null;
     Write("Initializing. Please wait ...");
 
     var globals = new Globals { vm = vm };
 
-    script = await CSharpScript.RunAsync(
+    script = CSharpScript.RunAsync(
             "",
             ScriptOptions.Default.WithReferences(new Assembly[] {
                 typeof(Globals).Assembly, typeof(Environment).Assembly}),
-            globals: globals);
+            globals: globals).Result;
     WriteLine(" done.");
 }
 
