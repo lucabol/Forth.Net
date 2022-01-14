@@ -271,7 +271,7 @@ public class Translator {
         var s = tr.NextWord('"');
         if(s == null) throw new Exception("End of input stream after .\"");
 
-        CompileOrEmit(function((Word w, Translator tr1) => tr1.Emit($"vm.output.WriteLine(\"{s}\");"), false), tr);
+        CompileOrEmit(function((Word w, Translator tr1) => tr1.Emit($"vm.output.Write(\"{s}\");"), false), tr);
     }
     public static void abort(Word w, Translator tr) {
         var s = tr.NextWord('"');
