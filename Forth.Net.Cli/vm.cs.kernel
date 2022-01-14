@@ -239,7 +239,7 @@ public static partial class VmExt
     public static void allot(ref Vm vm)
     {
         var n = popi(ref vm);
-        vm.here_p = vm.here_p + n;
+        vm.here_p += n;
     }
     private static int _align(int n, int alignment) => (n + (alignment - 1)) & ~(alignment - 1);
     [RE] public static void align(ref Vm vm) => vm.here_p = _align(vm.here_p, vm.CELL_SIZE);
