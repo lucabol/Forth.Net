@@ -9,13 +9,13 @@
   <Target Name="CopyVm1" AfterTargets="Build">
     <Copy
       SourceFiles="$(ProjectDir)vm.cs"
-        DestinationFiles="$(SolutionDir)Forth.Net.Cli/vm.cs.kernel" />
+      DestinationFiles="$(ProjectDir)../Forth.Net.Cli/vm.cs.kernel" />
   </Target>
 
   <Target Name="CopyVm2" AfterTargets="Build">
     <Copy
       SourceFiles="$(ProjectDir)vm.cs"
-        DestinationFiles="$(SolutionDir)Forth.Net.Tests/vm.cs.kernel" />
+      DestinationFiles="$(ProjectDir)../Forth.Net.Tests/vm.cs.kernel" />
 
     <Message Text="Copied vm.cs.kernel to CLI and Tests folder." Importance="High" />
   </Target>
