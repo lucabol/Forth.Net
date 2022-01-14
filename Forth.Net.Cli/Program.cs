@@ -219,8 +219,8 @@ string EscapeString(string str) {
     var s = str;
     s = s.Replace("\\", "\\\\");
     s = s.Replace("\"", "\\\"");
-    s = s.Replace("{", "{{");
-    s = s.Replace("}", "}}");
+    //s = s.Replace("{", "{{");
+    //s = s.Replace("}", "}}");
     return s;
 }
 void InitEngine(Options o) {

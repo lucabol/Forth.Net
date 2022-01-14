@@ -50,7 +50,7 @@ public struct Vm
 
     public int word;
 
-    public int inp = 0;
+    public int inp;
     public int source_max_chars;
     public int word_max_chars;
     public int input_len_chars = 0;
@@ -108,6 +108,9 @@ public struct Vm
 
         strings = here_p;
         here_p += strings_max_chars * Vm.CHAR_SIZE;
+
+        inp = here_p;
+        here_p += CELL_SIZE;
     }
     public void reset() {
         // Don't restart the ds. Is that right?
@@ -351,7 +354,7 @@ public static partial class VmExt
                 $"Cannot parse a line longer than {vm.source_max_chars}. {s} is {len} chars long.");
             var inputCharSpan = ToChars(ref vm, vm.source, vm.source_max_chars);
             s.CopyTo(inputCharSpan);
-            vm.inp = 0;
+            vm.ds[vm.inp] = 0;
             vm.input_len_chars = len;
             push(ref vm, Vm.TRUE);
         }
@@ -367,10 +370,12 @@ public static partial class VmExt
 
         var j = 1; // It is a counted string, the first 2 bytes contains the length
 
-        while (vm.inp < vm.input_len_chars && s[vm.inp] == delim) { vm.inp++; }
+        ref var inp = ref vm.ds[vm.inp];
+
+        while (inp < vm.input_len_chars && s[inp] == delim) { inp++; }
 
         // If all spaces to the end of the input, return a string with length 0. 
-        if (vm.inp >= vm.input_len_chars)
+        if (inp >= vm.input_len_chars)
         {
             w[0] = (char)0;
             push(ref vm, toPtr);
@@ -378,13 +383,13 @@ public static partial class VmExt
         }
 
         // Copy chars until end of space allocated, end of buffer or delim.
-        while (j < vm.word_max_chars && vm.inp < vm.input_len_chars && s[vm.inp] != delim)
+        while (j < vm.word_max_chars && inp < vm.input_len_chars && s[inp] != delim)
         {
-            var c = s[vm.inp++];
+            var c = s[inp++];
             w[j++] = c;
         }
         // Points past the delimiter. Otherwise it would stay on last " of a string.
-        vm.inp++;
+        if(inp < vm.input_len_chars) inp++;
         if (j >= vm.word_max_chars) throw new Exception($"Word longer than {vm.word_max_chars}: {s}");
 
         w[0] = (char)(j - 1);  // len goes into the first char
@@ -466,8 +471,8 @@ public static class Forth {
 public static void Test1(ref Vm vm) {
 
 VmExt._labelHere(ref vm, "test");
-vm.output.WriteLine("defining test as 1 + 1");
-vm.output.WriteLine("defined.");
+vm.output.Write("defining test as 1 + 1");
+vm.output.Write("defined.");
 
 }
 public static void Test2(ref Vm vm) {
@@ -485,7 +490,7 @@ VmExt.push(ref vm, c);
 }
 } while(false);
 
-vm.output.WriteLine("The value of test is ");
+vm.output.Write("The value of test is ");
 {
 VmExt._dot(ref vm);;
 
@@ -494,7 +499,7 @@ VmExt._labelHere(ref vm, "lat");
 VmExt._labelHere(ref vm, "flat");
 do {
 
-vm.output.WriteLine("<<bar>>");
+vm.output.Write("<<bar>>");
 VmExt.inpp(ref vm);
 VmExt.dup(ref vm);
 VmExt._fetch(ref vm);
@@ -516,7 +521,7 @@ VmExt.push(ref vm, b);
 VmExt._store(ref vm);
 } while(false);
 
-vm.output.WriteLine("Done.");
+vm.output.Write("Done.");
 
 }
 public static void RunAll(ref Vm vm) {
