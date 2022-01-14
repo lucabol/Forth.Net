@@ -199,6 +199,9 @@ async Task Interpret(Options o, Translator tr) {
 
                     script = await script.ContinueWithAsync(newCode);
                 }
+                // This is excedingly clever. It forces the input cursor to always be on the next
+                // line and the first position on the left.
+                if(CursorLeft != 0) Console.WriteLine();
 
             } catch(Exception e) {
                 ColorLine(ConsoleColor.Red, e.ToString());

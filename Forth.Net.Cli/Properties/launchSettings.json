@@ -1,8 +1,7 @@
 {
   "profiles": {
-    "Forth.Net.Cli": {
-      "commandName": "Project",
-      "commandLineArgs": "Test1.fth Test2.fth -o ../Compiled/Forth.cs"
+    "aInterpret1": {
+      "commandName": "Project"
     }
   }
 }
