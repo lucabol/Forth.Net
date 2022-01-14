@@ -41,7 +41,7 @@ public struct Vm
     public Dictionary<string, int> words = new();
 
     // Input/output buffer management.
-    public string inputBuffer;
+    public string inputBuffer = "";
 
     public TextWriter output;
     public TextReader input;
@@ -67,7 +67,7 @@ public struct Vm
     // Base management.
     public int base_p;
 
-    public Vm(string inputBuffer,
+    public Vm(
               TextReader input,
               TextWriter output,
               int ps_max_cells = 64,
@@ -86,7 +86,6 @@ public struct Vm
         rs = new nint[rs_max_cells * CELL_SIZE];
 
         xts = new ActionRef<Vm>[xts_max];
-        this.inputBuffer = inputBuffer;
         this.input = input;
         this.output = output;
 

@@ -11,7 +11,7 @@ using static System.Console;
 // Nice fat global variables to simplify code. It is unlikely this will go multithread.
 bool Verbose = false;
 bool Repl    = false;
-Vm vm        = new("TestXXX", Console.In, Console.Out);
+Vm vm        = new(Console.In, Console.Out);
 
 ScriptState<object>? script = null;
 
@@ -130,15 +130,14 @@ void ProcessReader(TextReader reader, Translator tr) {
             tr.setLine(line);
 
             while(true) {
-                tr.output.Clear();
                 var word = tr.NextWord();
                 if(word == null) break;
 
                 TranslateWord(word, tr);
 
-                var newCode = tr.output.ToString();
+                //var newCode = tr.output.ToString();
 
-                script = script.ContinueWithAsync(newCode).Result;
+                //script = script.ContinueWithAsync(newCode).Result;
             }
     }
 }
