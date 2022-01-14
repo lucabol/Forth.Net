@@ -17,12 +17,12 @@ ScriptState<object>? script = null;
 
 // Operating on the vm variable directly, without groing through the script object
 // introduces bizarre problems, where the state of the vm changes randomly.
-// Took forever to debug. Hence the inelegant functions below.
+// Took forever to debug. Hence the inelegant/slow approach below.
+// This get passed into the Translator to avoid a direct dependency to the VM.
 Action<string> setLine = line => {
     if(script == null) throw new Exception("Script cannot be null");
     var s = EscapeString(line);
-    script = script.ContinueWithAsync($"vm.inputBuffer = \"{s}\";").Result;
-    script = script.ContinueWithAsync("VmExt.refill(ref vm);VmExt.drop(ref vm);").Result;
+    script = script.ContinueWithAsync($"vm.inputBuffer = \"{s}\";VmExt.refill(ref vm);VmExt.drop(ref vm);").Result;
 };
 Func<char, string> getNextWord = c => {
     if(script == null) throw new Exception("Script cannot be null");
@@ -116,6 +116,16 @@ void CompileTo(Options o, Translator tr) {
     WriteLine(" done.");
 }
 
+void TranslateLine(Translator tr, string line) {
+    tr.setLine(line);
+
+    while(true) {
+        var word = tr.NextWord();
+        if(word == null) break;
+
+        TranslateWord(word, tr);
+    }
+}
 async Task Interpret(Options o, Translator tr) {
 
     await InitEngine(o);
@@ -125,15 +135,15 @@ async Task Interpret(Options o, Translator tr) {
     var filesCode = FlushToString(tr);
     if(!string.IsNullOrWhiteSpace(filesCode)) {
         Write("Interpreting Forth Files. Please wait ...");
-        script     = await script.ContinueWithAsync(filesCode).ConfigureAwait(false);
-        script     = await script.ContinueWithAsync("RunAll(ref vm);").ConfigureAwait(false);
+        script     = await script.ContinueWithAsync(filesCode);
+        script     = await script.ContinueWithAsync("RunAll(ref vm);");
         WriteLine(" done.");
     }
 
     if(o.Exec != null) {
         Write("Interpreting Exec instruction. Please wait ...");
         TranslateLine(tr, o.Exec);
-        script     = await script.ContinueWithAsync(FlushToString(tr)).ConfigureAwait(false);
+        script     = await script.ContinueWithAsync(FlushToString(tr));
         WriteLine(" done.");
     }
 
@@ -155,7 +165,6 @@ async Task Interpret(Options o, Translator tr) {
         while(true) {
 
             try {
-                tr.output.Clear();
                 System.ReadLine.AutoCompletionHandler = new AutoCompletionHandler(tr);
 
                 var line = System.ReadLine.Read("");
@@ -165,17 +174,26 @@ async Task Interpret(Options o, Translator tr) {
 
                 if(lowerLine == "debug") { debug = !debug; continue;}
 
-                TranslateLine(tr, line);
+                tr.setLine(line);
 
-                var newCode = tr.output.ToString();
+                while(true) {
+                    tr.output.Clear();
+                    var word = tr.NextWord();
+                    if(word == null) break;
 
-                if(debug) Console.WriteLine($"\n{newCode}");
+                    TranslateWord(word, tr);
 
-                script = await script.ContinueWithAsync(newCode).ConfigureAwait(false);
+                    var newCode = tr.output.ToString();
+
+                    if(debug) Console.WriteLine($"\n{newCode}");
+
+                    script = await script.ContinueWithAsync(newCode);
+                }
+
             } catch(Exception e) {
                 ColorLine(ConsoleColor.Red, e.ToString());
                 tr.Reset();
-                script = await script.ContinueWithAsync("vm.reset()").ConfigureAwait(false);
+                script = await script.ContinueWithAsync("vm.reset()");
             }
         }
     } finally {
@@ -203,7 +221,7 @@ async Task InitEngine(Options o) {
             "",
             ScriptOptions.Default.WithReferences(new Assembly[] {
                 typeof(Globals).Assembly, typeof(Environment).Assembly}),
-            globals: globals).ConfigureAwait(false);
+            globals: globals);
     WriteLine(" done.");
 }
 

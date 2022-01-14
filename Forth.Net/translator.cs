@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 public delegate void Definition(Word w, Translator tr);
 
@@ -49,7 +50,11 @@ public class Translator {
     public Action<string> setLine;
     public Func<char, string> getNextWord;
 
-    public Translator(StringBuilder output, Action<string> setLine, Func<char, string> getNextWord) {
+    public Translator(StringBuilder output,
+                      Action<string> setLine,
+                      Func<char, string> getNextWord
+                      ) {
+
         this.output      = output;
         this.setLine     = setLine;
         this.getNextWord = getNextWord;
@@ -101,7 +106,6 @@ public class Translator {
         if(tr.InDefinition) Compile(w, tr);
         else ExecuteDef(w, tr);
     }
-
     private static string NextWordLower(Word w, Translator tr) {
         var s = tr.NextWord();
         if(s == null) throw new Exception($"Unexpected end of input stream while processing {w.name}.");
@@ -109,7 +113,6 @@ public class Translator {
         s = s.ToLowerInvariant();
         return s;
     }
-
     public static void ColonDef(Word w, Translator tr) {
         var s = NextWordLower(w, tr);
 
@@ -557,7 +560,6 @@ static public partial class __GEN {{
             {"source"  ,  intrinsic("source")},
             {"count"   ,  intrinsic("count")},
             {"refill"  ,  intrinsic("refill")},
-            {"word"    ,  intrinsic("word")},
             {"bl"      ,  intrinsic("bl")},
             {"nl"      ,  intrinsic("nl")},
             {"_do"     ,  intrinsic("_do")},
@@ -570,6 +572,7 @@ static public partial class __GEN {{
             {"r@"    ,  intrinsic("fetchR")},
             {"+!"    ,  intrinsic("_fetchP")},
             {"move"    ,  intrinsic("move")},
+            {"word"    ,  intrinsic("word")},
             {"cmove"    ,  intrinsic("cmove")},
             {"cmove>"    ,  intrinsic("cmove")},
             {"fill"    ,  intrinsic("fill")},

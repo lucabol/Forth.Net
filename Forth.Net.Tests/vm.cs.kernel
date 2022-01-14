@@ -46,6 +46,8 @@ public struct Vm
     public TextWriter output;
     public TextReader input;
     public int source;
+    public int keyWord;
+
     public int word;
 
     public int inp = 0;
@@ -88,10 +90,13 @@ public struct Vm
         this.input = input;
         this.output = output;
 
-        word = here_p;
+        keyWord = here_p;
         here_p += word_max_chars * CHAR_SIZE;
         source = here_p;
         here_p += source_max_chars * CHAR_SIZE;
+
+        word = here_p;
+        here_p += word_max_chars * CHAR_SIZE;
 
         pad = here_p;
         here_p += pad_max;
@@ -353,11 +358,13 @@ public static partial class VmExt
         }
     }
     [RE]
-    public static void word(ref Vm vm)
+    public static void word(ref Vm vm, bool inKeyword = false)
     {
         var delim = (char)pop(ref vm);
         var s = ToChars(ref vm, vm.source, vm.input_len_chars);
-        var w = ToChars(ref vm, vm.word, vm.word_max_chars);
+        var toPtr = inKeyword ? vm.keyWord : vm.word;
+
+        var w = ToChars(ref vm, toPtr, vm.word_max_chars);
 
         var j = 1; // It is a counted string, the first 2 bytes contains the length
 
@@ -367,7 +374,7 @@ public static partial class VmExt
         if (vm.inp >= vm.input_len_chars)
         {
             w[0] = (char)0;
-            push(ref vm, vm.word);
+            push(ref vm, toPtr);
             return;
         }
 
@@ -382,13 +389,13 @@ public static partial class VmExt
         if (j >= vm.word_max_chars) throw new Exception($"Word longer than {vm.word_max_chars}: {s}");
 
         w[0] = (char)(j - 1);  // len goes into the first char
-        push(ref vm, vm.word);
+        push(ref vm, toPtr);
     }
     [RE]
     public static string nextword(ref Vm vm, char delim = ' ')
     {
         push(ref vm, delim);
-        word(ref vm);
+        word(ref vm, inKeyword: true);
         count(ref vm);
         var s = _dotNetString(ref vm);
         return s;
