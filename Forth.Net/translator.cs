@@ -226,7 +226,7 @@ public class Translator {
             tr.Emit(op);
     }
     public static void immediateDef(Word w, Translator tr) {
-        var word = tr.words[tr.lastWord].immediate = true;
+        tr.words[tr.lastWord].immediate = true;
     }
 
     public static void RecurseSubst(Translator tr, ref Word word) {
@@ -235,7 +235,7 @@ public class Translator {
 
         var funcName = ToCsharpId(word.name);
 
-        var isRecurse = tr.recurseActions.Count() != 0;
+        var isRecurse = tr.recurseActions.Count != 0;
         var actions = tr.recurseActions;
 
         foreach(var a in tr.recurseActions) {

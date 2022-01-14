@@ -11,7 +11,7 @@ using static System.Console;
 // Nice fat global variables to simplify code. It is unlikely this will go multithread.
 bool Verbose = false;
 bool Repl    = false;
-Vm vm        = new Vm("TestXXX", Console.In, Console.Out);
+Vm vm        = new("TestXXX", Console.In, Console.Out);
 
 ScriptState<object>? script = null;
 
@@ -78,7 +78,7 @@ void ValidateOptions(Options o) {
         WriteLine("You can either execute or compile code, not both.");
         Environment.Exit(1);
     }
-    if(o.Output != null && (o.Files == null || o.Files.Count() == 0)) {
+    if(o.Output != null && (o.Files == null || !o.Files.Any())) {
         WriteLine("You say you want to compile, but didn't pass any files.");
         Environment.Exit(1);
     }
@@ -94,7 +94,7 @@ void ProcessFiles(Options o, Translator tr) {
         TranslateReader(reader, tr);
         EmitFunctionEnding(tr);
     }
-    if(files.Count() != 0) {
+    if(files.Any()) {
         EmitFunctionPreamble(tr, "RunAll");
         foreach(var (name, _) in files)
             EmitFunctionCall(tr, name);
