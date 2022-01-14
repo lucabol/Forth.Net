@@ -2,14 +2,35 @@
 using CommandLine;
 using CommandLine.Text;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
+using Microsoft.CodeAnalysis.Scripting;
+using System.Reflection;
 using static Translator;
 
 using static System.Console;
 
+// Nice fat global variables to simplify code. It is unlikely this will go multithread.
 bool Verbose = false;
 bool Repl    = false;
+Vm vm        = new Vm("TestXXX", Console.In, Console.Out);
 
-var parser = new CommandLine.Parser(with => with.HelpWriter = null);
+ScriptState<object>? script = null;
+
+// Operating on the vm variable directly, without groing through the script object
+// introduces bizarre problems, where the state of the vm changes randomly.
+// Took forever to debug. Hence the inelegant/slow approach below.
+// This get passed into the Translator to avoid a direct dependency to the VM.
+Action<string> setLine = line => {
+    if(script == null) throw new Exception("Script cannot be null");
+    var s = EscapeString(line);
+    script = script.ContinueWithAsync($"vm.inputBuffer = \"{s}\";VmExt.refill(ref vm);VmExt.drop(ref vm);").Result;
+};
+Func<char, string> getNextWord = c => {
+    if(script == null) throw new Exception("Script cannot be null");
+    script = script.ContinueWithAsync($"return VmExt.nextword(ref vm, '{c}');").Result;
+    return (string)script.ReturnValue;
+};
+
+var parser       = new CommandLine.Parser(with => with.HelpWriter = null);
 var parserResult = parser.ParseArguments<Options>(args);
 parserResult
 .WithParsed<Options>(options => Run(options))
@@ -21,7 +42,7 @@ void Run(Options o) {
     ValidateOptions(o);
 
     StringBuilder sb = new();
-    Translator tr = new(sb);
+    Translator tr = new(sb, setLine, getNextWord);
 
     ProcessFiles(o, tr);
 
@@ -95,33 +116,34 @@ void CompileTo(Options o, Translator tr) {
     WriteLine(" done.");
 }
 
+void TranslateLine(Translator tr, string line) {
+    tr.setLine(line);
+
+    while(true) {
+        var word = tr.NextWord();
+        if(word == null) break;
+
+        TranslateWord(word, tr);
+    }
+}
 async Task Interpret(Options o, Translator tr) {
 
-    Repl = o.Exec == null;
-    Write("Initializing. Please wait ...");
+    await InitEngine(o);
 
-    var vmCode  = LoadVmCode();
-
-    var globals = new Globals { input = Console.In, output = Console.Out };
-    var vmnew   = "var vm = new Vm(input, output);";
-
-
-    var script = await CSharpScript.RunAsync(vmCode, globals: globals).ConfigureAwait(false);
-    script     = await script.ContinueWithAsync(vmnew).ConfigureAwait(false);
-    WriteLine(" done.");
+    if(script == null) throw new Exception("InitEngine not called");
 
     var filesCode = FlushToString(tr);
     if(!string.IsNullOrWhiteSpace(filesCode)) {
         Write("Interpreting Forth Files. Please wait ...");
-        script     = await script.ContinueWithAsync(filesCode).ConfigureAwait(false);
-        script     = await script.ContinueWithAsync("RunAll(ref vm);").ConfigureAwait(false);
+        script     = await script.ContinueWithAsync(filesCode);
+        script     = await script.ContinueWithAsync("RunAll(ref vm);");
         WriteLine(" done.");
     }
 
     if(o.Exec != null) {
         Write("Interpreting Exec instruction. Please wait ...");
         TranslateLine(tr, o.Exec);
-        script     = await script.ContinueWithAsync(FlushToString(tr)).ConfigureAwait(false);
+        script     = await script.ContinueWithAsync(FlushToString(tr));
         WriteLine(" done.");
     }
 
@@ -143,31 +165,64 @@ async Task Interpret(Options o, Translator tr) {
         while(true) {
 
             try {
-                tr.output.Clear();
                 System.ReadLine.AutoCompletionHandler = new AutoCompletionHandler(tr);
 
                 var line = System.ReadLine.Read("");
                 if(line == null) break;
+
                 var lowerLine = line.Trim().ToLowerInvariant();
 
                 if(lowerLine == "debug") { debug = !debug; continue;}
 
+                tr.setLine(line);
 
-                Translator.TranslateLine(tr, line);
-                var newCode = tr.output.ToString();
+                while(true) {
+                    tr.output.Clear();
+                    var word = tr.NextWord();
+                    if(word == null) break;
 
-                if(debug) Console.WriteLine($"\n{newCode}");
+                    TranslateWord(word, tr);
 
-                script = await script.ContinueWithAsync(newCode).ConfigureAwait(false);
+                    var newCode = tr.output.ToString();
+
+                    if(debug) Console.WriteLine($"\n{newCode}");
+
+                    script = await script.ContinueWithAsync(newCode);
+                }
+
             } catch(Exception e) {
                 ColorLine(ConsoleColor.Red, e.ToString());
                 tr.Reset();
-                script = await script.ContinueWithAsync("vm.reset()").ConfigureAwait(false);
+                script = await script.ContinueWithAsync("vm.reset()");
             }
         }
     } finally {
         ResetColor();
     }
+}
+
+string EscapeString(string str) {
+    
+    var s = str;
+    s = s.Replace("\\", "\\\\");
+    s = s.Replace("\"", "\\\"");
+    s = s.Replace("{", "{{");
+    s = s.Replace("}", "}}");
+    return s;
+}
+async Task InitEngine(Options o) {
+
+    Repl = o.Exec == null;
+    Write("Initializing. Please wait ...");
+
+    var globals = new Globals { vm = vm };
+
+    script = await CSharpScript.RunAsync(
+            "",
+            ScriptOptions.Default.WithReferences(new Assembly[] {
+                typeof(Globals).Assembly, typeof(Environment).Assembly}),
+            globals: globals);
+    WriteLine(" done.");
 }
 
 void Write(string s) { if(Verbose || Repl) Console.Write(s);}
@@ -187,7 +242,7 @@ public class Options {
     public bool Verbose {get; set;} = false;
 }
 
-public class Globals { public TextReader? input; public TextWriter? output; }
+public class Globals {public Vm vm;}
 
 class AutoCompletionHandler : IAutoCompleteHandler
 {

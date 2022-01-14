@@ -2,9 +2,23 @@ using Xunit;
 using System.IO;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using System.Text;
+using System;
 
 public class TranslatorTests
 {
+    /*
+    Vm vm        = new Vm("TestXXX", Console.In, Console.Out);
+
+    ScriptState<object>? script = null;
+
+
+    Action<string> setLine = line => {
+        vm.inputBuffer = line;
+        VmExt.refill(ref vm);
+        VmExt.drop(ref vm);
+    };
+    Func<char, string> getNextWord = c => VmExt.nextword(ref vm);
+
     [Theory]
     [InlineData("10 20 +", 30)]
     [InlineData("1 dup dup drop drop", 1)]
@@ -30,4 +44,5 @@ public class TranslatorTests
 
         Assert.Equal(result, state.ReturnValue);
     }
+    */
 }

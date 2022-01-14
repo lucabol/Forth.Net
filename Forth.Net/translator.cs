@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.Linq;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 public delegate void Definition(Word w, Translator tr);
 
@@ -21,8 +22,6 @@ public class Translator {
 
     // Input and outputs.
     public StringBuilder output;
-
-    public string? line;
 
     // Manage definition words.
     public bool InDefinition  = false;
@@ -46,33 +45,32 @@ public class Translator {
     // Number of immediates in the definition;
     public int literalCount = 0;
 
-    public Translator(StringBuilder output) {
-        this.output  = output;
+    // The input buffer needs to be accessible at run time (aka from a running Forth vm).
+    // Insted of passing the vm in, we generalize a little by passing callbacks.
+    public Action<string> setLine;
+    public Func<char, string> getNextWord;
+
+    public Translator(StringBuilder output,
+                      Action<string> setLine,
+                      Func<char, string> getNextWord
+                      ) {
+
+        this.output      = output;
+        this.setLine     = setLine;
+        this.getNextWord = getNextWord;
 
         // TODO: this is a hack. The word constructing words should set the name.
         foreach(var (key, value) in words)
             value.name = key;
     }
 
-    // I can't use an iterator returning method because CreateWord need access to the next word.
     public string? NextWord(char sep = ' ') {
-        while(string.IsNullOrWhiteSpace(line)) return null;
-
-        string word;
-        line = line.Trim();
-        var index = line.IndexOf(sep);
-        if(index == -1) {
-            word = line;
-            line = null;
-            return word;
-        }
-
-        word = line.Substring(0, index);
-        line = line.Substring(index + 1);
-        return word;
+        var s = this.getNextWord(sep);
+        if(string.IsNullOrWhiteSpace(s)) return null;
+        return s;
     }
 
-    public void Reset() { line = null; InDefinition = false; nested = 0;}
+    public void Reset() {  InDefinition = false; nested = 0;}
 
     public static void CommentP(Word w, Translator tr) {
         string? word;
@@ -81,7 +79,10 @@ public class Translator {
         } while(word != null && word != ")");
     }
     public static void CommentS(Word w, Translator tr) {
-        tr.line = "";
+        string? word;
+        do {
+            word = tr.NextWord();
+        } while(word != null);
     }
 
     public void Emit(string s) => output.AppendLine(s);
@@ -105,7 +106,6 @@ public class Translator {
         if(tr.InDefinition) Compile(w, tr);
         else ExecuteDef(w, tr);
     }
-
     private static string NextWordLower(Word w, Translator tr) {
         var s = tr.NextWord();
         if(s == null) throw new Exception($"Unexpected end of input stream while processing {w.name}.");
@@ -113,7 +113,6 @@ public class Translator {
         s = s.ToLowerInvariant();
         return s;
     }
-
     public static void ColonDef(Word w, Translator tr) {
         var s = NextWordLower(w, tr);
 
@@ -446,7 +445,8 @@ while({c}({i}, {e})) {{
     }
 
     public static void TranslateLine(Translator tr, string line) {
-        tr.line = line;
+        tr.setLine(line);
+
         while(true) {
             var word = tr.NextWord();
             if(word == null) break;
@@ -560,7 +560,6 @@ static public partial class __GEN {{
             {"source"  ,  intrinsic("source")},
             {"count"   ,  intrinsic("count")},
             {"refill"  ,  intrinsic("refill")},
-            {"word"    ,  intrinsic("word")},
             {"bl"      ,  intrinsic("bl")},
             {"nl"      ,  intrinsic("nl")},
             {"_do"     ,  intrinsic("_do")},
@@ -573,6 +572,7 @@ static public partial class __GEN {{
             {"r@"    ,  intrinsic("fetchR")},
             {"+!"    ,  intrinsic("_fetchP")},
             {"move"    ,  intrinsic("move")},
+            {"word"    ,  intrinsic("word")},
             {"cmove"    ,  intrinsic("cmove")},
             {"cmove>"    ,  intrinsic("cmove")},
             {"fill"    ,  intrinsic("fill")},
@@ -616,7 +616,7 @@ static public partial class __GEN {{
             {"s\""  , function(SStringDef, true)},
             {"c\""  , function(CStringDef, true)},
             {"recurse"  , function(RecurseDef, true)},
-            {"bye"  , function((Word _, Translator tr) => tr.Emit("Environment.Exit(0);"), false)},
+            {"bye"  , function((Word _, Translator tr) => tr.Emit("System.Environment.Exit(0);"), false)},
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
