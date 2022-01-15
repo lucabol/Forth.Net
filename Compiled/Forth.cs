@@ -471,8 +471,12 @@ public static class Forth {
 public static void Test1(ref Vm vm) {
 
 VmExt._labelHere(ref vm, "test");
-vm.output.Write("defining test as 1 + 1");
+vm.output.Write("defining test as 1 + 1 ...");
 vm.output.Write("defined.");
+{
+vm.output.WriteLine();
+
+}
 VmExt._labelHere(ref vm, "--");
 VmExt.pushs(ref vm, "1");
 VmExt.pushs(ref vm, "1");
@@ -506,6 +510,10 @@ vm.output.Write("The value of test is ");
 VmExt._dot(ref vm);;
 
 }
+{
+vm.output.WriteLine();
+
+}
 VmExt._labelHere(ref vm, "lat");
 VmExt._labelHere(ref vm, "flat");
 do {
@@ -532,7 +540,11 @@ VmExt.push(ref vm, b);
 VmExt._store(ref vm);
 } while(false);
 
-vm.output.Write("Done.");
+{
+vm.output.WriteLine();
+
+}
+vm.output.Write("All Done.");
 
 }
 public static void RunAll(ref Vm vm) {
