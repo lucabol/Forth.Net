@@ -48,8 +48,6 @@ void Run(Options o) {
     StringBuilder sb = new();
     Translator tr = new(sb, setLine, getNextWord);
 
-    ProcessFiles(o, tr);
-
     if(o.Output != null)
         CompileTo(o, tr);
     else
@@ -89,7 +87,7 @@ void ValidateOptions(Options o) {
     Verbose = o.Verbose;
 }
 
-void ProcessFiles(Options o, Translator tr) {
+void CompileFiles(Options o, Translator tr) {
     IEnumerable<(string, TextReader)> files = 
         o.Files.Select(f => (Path.GetFileNameWithoutExtension(f), (TextReader) new StreamReader(f)));
 
@@ -107,6 +105,9 @@ void ProcessFiles(Options o, Translator tr) {
 }
 
 void CompileTo(Options o, Translator tr) {
+
+    CompileFiles(o, tr);
+
     Write("Compiling. Please wait ...");
     StringBuilder sb = new();
 
@@ -134,25 +135,44 @@ void ProcessReader(TextReader reader, Translator tr) {
                 if(word == null) break;
 
                 TranslateWord(word, tr);
-
-                //var newCode = tr.output.ToString();
-
-                //script = script.ContinueWithAsync(newCode).Result;
             }
+    }
+}
+
+async Task InterpretFiles(Options o, Translator tr) {
+
+    if(script == null) throw new Exception("InitEngine failed.");
+
+    IEnumerable<(string, TextReader)> files = 
+        o.Files.Select(f => (Path.GetFileNameWithoutExtension(f), (TextReader) new StreamReader(f)));
+
+    foreach (var (_, reader) in files)
+    {
+        while(true) {
+                var line = reader.ReadLine();
+                if(line == null) break;
+
+                tr.setLine(line);
+
+                while(true) {
+                    tr.output.Clear();
+                    var word = tr.NextWord();
+                    if(word == null) break;
+
+                    TranslateWord(word, tr);
+
+                    var newCode = tr.output.ToString();
+
+                    script = await script.ContinueWithAsync(newCode);
+                }
+        }
     }
 }
 
 async Task Interpret(Options o, Translator tr) {
 
-    /*
-    var filesCode = FlushToString(tr);
-    if(!string.IsNullOrWhiteSpace(filesCode)) {
-        Write("Interpreting Forth Files. Please wait ...");
-        script     = await script.ContinueWithAsync(filesCode);
-        script     = await script.ContinueWithAsync("RunAll(ref vm);");
-        WriteLine(" done.");
-    }
-    */
+    await InterpretFiles(o, tr);
+
     if(o.Exec != null) {
         Write("Interpreting Exec instruction. Please wait ...");
         TranslateLine(tr, o.Exec);
@@ -219,8 +239,8 @@ string EscapeString(string str) {
     var s = str;
     s = s.Replace("\\", "\\\\");
     s = s.Replace("\"", "\\\"");
-    s = s.Replace("{", "{{");
-    s = s.Replace("}", "}}");
+    //s = s.Replace("{", "{{");
+    //s = s.Replace("}", "}}");
     return s;
 }
 void InitEngine(Options o) {
