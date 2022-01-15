@@ -34,6 +34,13 @@ Func<char, string> getNextWord = c => {
     return w;
 };
 
+// If compiling, we don't need to go through the script object, speeding up things considerably.
+Action<string> setLineC = line => {
+    vm.inputBuffer = line; VmExt.refill(ref vm);VmExt.drop(ref vm);
+};
+
+Func<char, string> getNextWordC = c => VmExt.nextword(ref vm, c);
+
 var parser       = new CommandLine.Parser(with => with.HelpWriter = null);
 var parserResult = parser.ParseArguments<Options>(args);
 parserResult
@@ -46,17 +53,10 @@ void Run(Options o) {
 
     Repl = o.Exec == null;
 
-    // TODO: this is slow as using the script engine to parse line even in the compile case.
-    // Left it because I am trying to make 'word' works.
-    InitEngine(o);
-
-    StringBuilder sb = new();
-    Translator tr = new(sb, setLine, getNextWord);
-
     if(o.Output != null)
-        CompileTo(o, tr);
+        CompileTo(o);
     else
-        Interpret(o, tr).Wait();
+        Interpret(o).Wait();
 }
 
 static void DisplayHelp<T>(ParserResult<T> result, IEnumerable<Error> errs)
@@ -109,7 +109,9 @@ void CompileFiles(Options o, Translator tr) {
     }
 }
 
-void CompileTo(Options o, Translator tr) {
+void CompileTo(Options o) {
+
+    Translator tr = new(new StringBuilder(), setLineC, getNextWordC);
 
     CompileFiles(o, tr);
 
@@ -178,8 +180,11 @@ async Task InterpretFiles(Options o, Translator tr) {
     }
 }
 
-async Task Interpret(Options o, Translator tr) {
+async Task Interpret(Options o) {
 
+    InitEngine(o);
+
+    Translator tr = new(new StringBuilder(), setLine, getNextWord);
 
     if(script == null) throw new Exception("InitEngine failed.");
 
