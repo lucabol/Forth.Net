@@ -473,6 +473,17 @@ public static void Test1(ref Vm vm) {
 VmExt._labelHere(ref vm, "test");
 vm.output.Write("defining test as 1 + 1");
 vm.output.Write("defined.");
+VmExt._labelHere(ref vm, "--");
+VmExt.pushs(ref vm, "1");
+VmExt.pushs(ref vm, "1");
+{
+var a = VmExt.pop(ref vm);
+var b = VmExt.pop(ref vm);
+var c = b + a;
+VmExt.push(ref vm, c);
+
+}
+VmExt.drop(ref vm);
 
 }
 public static void Test2(ref Vm vm) {

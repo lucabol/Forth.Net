@@ -1,7 +1,9 @@
 {
   "profiles": {
     "aInterpret1": {
-      "commandName": "Project"
+      "commandName": "Project",
+      "commandLineArgs": "Test1.fth Test2.fth -o ..\\Compiled\\Forth.cs",
+      "workingDirectory": "C:\\dev\\Forth.Net\\Forth.Net.Cli"
     }
   }
 }
