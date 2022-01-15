@@ -15,6 +15,9 @@ Vm vm        = new(Console.In, Console.Out);
 
 ScriptState<object>? script = null;
 
+// I cannot compile these words to C# as they assume there is a vm running at compile time (aka an interpret)
+HashSet<string> invalidCompileWords = new(new string[] {"word", "source", ">in"});
+
 // Operating on the vm variable directly, without groing through the script object
 // introduces bizarre problems, where the state of the vm changes randomly.
 // Took forever to debug. Hence the inelegant/slow approach below.
@@ -27,23 +30,25 @@ Action<string> setLine = line => {
 Func<char, string> getNextWord = c => {
     if(script == null) throw new Exception("Script cannot be null");
     script = script.ContinueWithAsync($"return VmExt.nextword(ref vm, '{c}');").Result;
-    return (string)script.ReturnValue;
+    var w = (string)script.ReturnValue; 
+    return w;
 };
 
 var parser       = new CommandLine.Parser(with => with.HelpWriter = null);
 var parserResult = parser.ParseArguments<Options>(args);
 parserResult
-.WithParsed<Options>(options => Run(options))
-.WithNotParsed(errs => DisplayHelp(parserResult, errs));
-
+    .WithParsed<Options>(options => Run(options))
+    .WithNotParsed(errs => DisplayHelp(parserResult, errs));
 
 void Run(Options o) {
 
     ValidateOptions(o);
 
-    InitEngine(o);
+    Repl = o.Exec == null;
 
-    if(script == null) throw new Exception("InitEngine failed.");
+    // TODO: this is slow as using the script engine to parse line even in the compile case.
+    // Left it because I am trying to make 'word' works.
+    InitEngine(o);
 
     StringBuilder sb = new();
     Translator tr = new(sb, setLine, getNextWord);
@@ -134,6 +139,10 @@ void ProcessReader(TextReader reader, Translator tr) {
                 var word = tr.NextWord();
                 if(word == null) break;
 
+                if(invalidCompileWords.Contains(word.ToLowerInvariant()))
+                    ColorLine(ConsoleColor.Red,
+              $"You cannot use the word '{word}' at compile time as there is no input text buffer.");
+
                 TranslateWord(word, tr);
             }
     }
@@ -170,6 +179,9 @@ async Task InterpretFiles(Options o, Translator tr) {
 }
 
 async Task Interpret(Options o, Translator tr) {
+
+
+    if(script == null) throw new Exception("InitEngine failed.");
 
     await InterpretFiles(o, tr);
 
@@ -245,7 +257,6 @@ string EscapeString(string str) {
 }
 void InitEngine(Options o) {
 
-    Repl = o.Exec == null;
     Write("Initializing. Please wait ...");
 
     var globals = new Globals { vm = vm };

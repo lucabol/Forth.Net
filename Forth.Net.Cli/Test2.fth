@@ -1,5 +1,5 @@
-test ." The value of test is " .
+test ." The value of test is " . cr
 : lat ." <<foo>>" ;
 : flat ." <<bar>>" >IN DUP @ 3 - SWAP ! ;
- flat
-." Done."
+flat
+cr ." All Done."
