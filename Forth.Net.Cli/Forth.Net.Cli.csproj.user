@@ -4,6 +4,6 @@
     <DebuggerFlavor>ProjectDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup>
-    <ActiveDebugProfile>InterpretFiles</ActiveDebugProfile>
+    <ActiveDebugProfile>Repl</ActiveDebugProfile>
   </PropertyGroup>
 </Project>

@@ -63,8 +63,20 @@ public class Translator {
         this.getTosString = getTosString;
 
         // TODO: this is a hack. The word constructing words should set the name.
-        foreach(var (key, value) in words)
+        foreach(var (key, value) in words) {
             value.name = key;
+            /*
+            var funcName = ToCsharpId(key);
+            try { 
+                EmitFunc(value, this, funcName);
+                value.tickdefined = true;
+                RegisterTick(value, this, funcName);
+            } catch(Exception e) {
+                Console.WriteLine($"{key} {funcName} \n {e}");
+            }
+            */
+
+        }
     }
 
     public string? NextWord(char sep = ' ') {
@@ -157,7 +169,6 @@ public class Translator {
     }
     public static void SemiColonDef(Word w, Translator tr) {
         if(tr.defActions == null) throw new Exception("Semicolon (;) seen in interpret mode");
-
 
         var wordName = tr.lastWord;
 
