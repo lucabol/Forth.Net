@@ -34,12 +34,21 @@ Func<char, string> getNextWord = c => {
     return w;
 };
 
+Func<string> getTosString = () => {
+    if(script == null) throw new Exception("Script cannot be null");
+    script = script.ContinueWithAsync($"VmExt.dup(ref vm); VmExt.count(ref vm); return VmExt.dotNetString(ref vm);").Result;
+    var w = (string)script.ReturnValue; 
+    return w;
+
+};
 // If compiling, we don't need to go through the script object, speeding up things considerably.
 Action<string> setLineC = line => {
     vm.inputBuffer = line; VmExt.refill(ref vm);VmExt.drop(ref vm);
 };
 
 Func<char, string> getNextWordC = c => VmExt.nextword(ref vm, c);
+
+Func<string> getTosStringC = () => throw new Exception("There is no running vm while compiling to C#");
 
 var parser       = new CommandLine.Parser(with => with.HelpWriter = null);
 var parserResult = parser.ParseArguments<Options>(args);
@@ -111,7 +120,7 @@ void CompileFiles(Options o, Translator tr) {
 
 void CompileTo(Options o) {
 
-    Translator tr = new(new StringBuilder(), setLineC, getNextWordC);
+    Translator tr = new(new StringBuilder(), setLineC, getNextWordC, getTosStringC);
 
     CompileFiles(o, tr);
 
@@ -184,7 +193,7 @@ async Task Interpret(Options o) {
 
     InitEngine(o);
 
-    Translator tr = new(new StringBuilder(), setLine, getNextWord);
+    Translator tr = new(new StringBuilder(), setLine, getNextWord, getTosString);
 
     if(script == null) throw new Exception("InitEngine failed.");
 

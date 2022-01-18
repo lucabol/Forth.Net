@@ -74,7 +74,7 @@ public struct Vm
               int ds_max_bytes = 64 * 16 * 1_024,
               int rs_max_cells = 64,
               int source_max_chars = 1_024,
-              int word_max_chars = 31,
+              int word_max_chars = 64,
               int xts_max = 64,
               int pad_max = 64,
               int strings_max_chars = 1_024

@@ -49,15 +49,18 @@ public class Translator {
     // Insted of passing the vm in, we generalize a little by passing callbacks.
     public Action<string> setLine;
     public Func<char, string> getNextWord;
+    public Func<string> getTosString;
 
     public Translator(StringBuilder output,
                       Action<string> setLine,
-                      Func<char, string> getNextWord
+                      Func<char, string> getNextWord,
+                      Func<string> getTosString
                       ) {
 
-        this.output      = output;
-        this.setLine     = setLine;
-        this.getNextWord = getNextWord;
+        this.output       = output;
+        this.setLine      = setLine;
+        this.getNextWord  = getNextWord;
+        this.getTosString = getTosString;
 
         // TODO: this is a hack. The word constructing words should set the name.
         foreach(var (key, value) in words)
@@ -208,6 +211,25 @@ public class Translator {
             tr.words[w.name] = w;
     }
 
+    public static void FindDef(Word w, Translator tr) {
+        var s = tr.getTosString();
+        var funcName = ToCsharpId(s);
+
+        if(!tr.words.TryGetValue(s, out var word)) {
+            // The address is already top of stack because of the dup in getTosString.
+            tr.Emit("VmExt.push(ref vm, 0);");
+            return;
+        }
+
+        if(!word.tickdefined) {
+            EmitFunc(word, tr, funcName);
+            RegisterTick(word, tr, funcName);
+        }
+
+        var im = word.immediate ? 1 : -1;
+        var op = $"VmExt.drop(ref vm); VmExt.push(ref vm, vm.wordToXts[\"{word.name}\"]); VmExt.push(ref vm, {im});";
+        tr.Emit(op);
+    }
     public static void TickDef(Word w, Translator tr) {
         var s = NextWordLower(w, tr);
         var funcName = ToCsharpId(s);
@@ -617,6 +639,7 @@ static public partial class __GEN {{
             {"c\""  , function(CStringDef, true)},
             {"recurse"  , function(RecurseDef, true)},
             {"bye"  , function((Word _, Translator tr) => tr.Emit("System.Environment.Exit(0);"), false)},
+            {"find"  , function(FindDef, false)},
 
             {"."       ,   inline("_dot;")},
             {"cr"      ,   inline("vm.output.WriteLine();")},
