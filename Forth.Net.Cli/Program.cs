@@ -120,7 +120,7 @@ void CompileFiles(Options o, Translator tr) {
 
 void CompileTo(Options o) {
 
-    Translator tr = new(new StringBuilder(), setLineC, getNextWordC, getTosStringC);
+    Translator tr = new(new StringBuilder(), new StringBuilder(),  setLineC, getNextWordC, getTosStringC);
 
     CompileFiles(o, tr);
 
@@ -131,7 +131,7 @@ void CompileTo(Options o) {
     sb.Append(vmCode);
 
     sb.Append("public static class Forth {\n");
-    sb.Append(FlushToString(tr));
+    sb.Append(FlashStatements(tr));
     sb.Append("\n}");
     File.WriteAllText(o.Output, sb.ToString());
     WriteLine(" done.");
@@ -175,13 +175,13 @@ async Task InterpretFiles(Options o, Translator tr) {
                 tr.setLine(line);
 
                 while(true) {
-                    tr.output.Clear();
+                    tr.statements.Clear();
                     var word = tr.NextWord();
                     if(word == null) break;
 
                     TranslateWord(word, tr);
 
-                    var newCode = tr.output.ToString();
+                    var newCode = tr.statements.ToString();
 
                     script = await script.ContinueWithAsync(newCode);
                 }
@@ -191,9 +191,9 @@ async Task InterpretFiles(Options o, Translator tr) {
 
 async Task Interpret(Options o) {
 
-    InitEngine(o);
+    Translator tr = new(new StringBuilder(), new StringBuilder(), setLine, getNextWord, getTosString);
 
-    Translator tr = new(new StringBuilder(), setLine, getNextWord, getTosString);
+    InitEngine(tr, o);
 
     if(script == null) throw new Exception("InitEngine failed.");
 
@@ -202,7 +202,7 @@ async Task Interpret(Options o) {
     if(o.Exec != null) {
         Write("Interpreting Exec instruction. Please wait ...");
         TranslateLine(tr, o.Exec);
-        script     = await script.ContinueWithAsync(FlushToString(tr));
+        script     = await script.ContinueWithAsync(FlashStatements(tr));
         WriteLine(" done.");
     }
 
@@ -218,12 +218,17 @@ async Task Interpret(Options o) {
 
         System.ReadLine.HistoryEnabled = true;
 
+        // Trying to remove a delay in the first execution by 'priming the pump'.
+        tr.setLine("1 drop");
+
         while(true) {
 
             try {
                 System.ReadLine.AutoCompletionHandler = new AutoCompletionHandler(tr);
 
+                Console.CursorVisible = true;
                 var line = System.ReadLine.Read("");
+                Console.CursorVisible = false;
                 if(line == null) break;
 
                 var lowerLine = line.Trim().ToLowerInvariant();
@@ -233,17 +238,21 @@ async Task Interpret(Options o) {
                 tr.setLine(line);
 
                 while(true) {
-                    tr.output.Clear();
                     var word = tr.NextWord();
                     if(word == null) break;
 
                     TranslateWord(word, tr);
 
-                    var newCode = tr.output.ToString();
+                    var newDeclarations = FlashDeclarations(tr);
+                    var newStatements = FlashStatements(tr);
 
-                    if(debug) Console.WriteLine($"\n{newCode}");
+                    if(debug) {
+                        Console.WriteLine($"\n{newDeclarations}");
+                        Console.WriteLine($"\n{newStatements}");
+                    }
 
-                    script = await script.ContinueWithAsync(newCode);
+                    script = await script.ContinueWithAsync(
+                        newDeclarations + newStatements);
                 }
                 // This is excedingly clever. It forces the input cursor to always be on the next
                 // line and the first position on the left.
@@ -257,6 +266,7 @@ async Task Interpret(Options o) {
         }
     } finally {
         ResetColor();
+        Console.CursorVisible = true;
     }
 }
 
@@ -265,18 +275,19 @@ string EscapeString(string str) {
     var s = str;
     s = s.Replace("\\", "\\\\");
     s = s.Replace("\"", "\\\"");
-    //s = s.Replace("{", "{{");
-    //s = s.Replace("}", "}}");
+    s = s.Replace("{", "{{");
+    s = s.Replace("}", "}}");
     return s;
 }
-void InitEngine(Options o) {
+void InitEngine(Translator tr, Options o) {
 
     Write("Initializing. Please wait ...");
 
     var globals = new Globals { vm = vm };
+    var initCode = FlashStatements(tr);
 
     script = CSharpScript.RunAsync(
-            "",
+            initCode,
             ScriptOptions.Default.WithReferences(new Assembly[] {
                 typeof(Globals).Assembly, typeof(Environment).Assembly}),
             globals: globals).Result;

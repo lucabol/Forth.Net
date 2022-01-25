@@ -64,6 +64,7 @@ public struct Vm
     // state: compiling -> true, interpreting -> false.
     public int state = 0;
 
+    public string lastCreatedWord = "";
     // Base management.
     public int base_p;
 
@@ -75,7 +76,7 @@ public struct Vm
               int rs_max_cells = 64,
               int source_max_chars = 1_024,
               int word_max_chars = 64,
-              int xts_max = 64,
+              int xts_max = 2048,
               int pad_max = 64,
               int strings_max_chars = 1_024
               )
