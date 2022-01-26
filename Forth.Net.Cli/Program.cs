@@ -261,7 +261,9 @@ async Task Interpret(Options o) {
                 if(CursorLeft != 0) Console.WriteLine();
 
             } catch(Exception e) {
-                ColorLine(ConsoleColor.Red, e.ToString());
+                ColorLine(ConsoleColor.Red, e.Message.ToString());
+                if(e.InnerException is IndexOutOfRangeException)
+                    ColorLine(ConsoleColor.Red, "Likely stack underflow. Did you enough iterms on the stack?");
                 tr = tr.Reset();
                 script = await script.ContinueWithAsync("vm.reset()");
             } finally {
