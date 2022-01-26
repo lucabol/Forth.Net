@@ -4,13 +4,17 @@ using CommandLine.Text;
 using Microsoft.CodeAnalysis.CSharp.Scripting;
 using Microsoft.CodeAnalysis.Scripting;
 using System.Reflection;
-using static Translator;
+using static TranslatorUtils.TranslatorExt;
 
 using static System.Console;
+using System.Collections.Immutable;
+using System;
 
 // Nice fat global variables to simplify code. It is unlikely this will go multithread.
 bool Verbose = false;
 bool Repl    = false;
+bool Debug   = false;
+
 Vm vm        = new(Console.In, Console.Out);
 
 ScriptState<object>? script = null;
@@ -26,12 +30,6 @@ Action<string> setLine = line => {
     if(script == null) throw new Exception("Script cannot be null");
     var s = EscapeString(line);
     script = script.ContinueWithAsync($"vm.inputBuffer = \"{s}\";VmExt.refill(ref vm);VmExt.drop(ref vm);").Result;
-};
-Func<char, string> getNextWord = c => {
-    if(script == null) throw new Exception("Script cannot be null");
-    script = script.ContinueWithAsync($"return VmExt.nextword(ref vm, '{c}');").Result;
-    var w = (string)script.ReturnValue; 
-    return w;
 };
 
 Func<string> getTosString = () => {
@@ -102,6 +100,7 @@ void ValidateOptions(Options o) {
 }
 
 void CompileFiles(Options o, Translator tr) {
+    /*
     IEnumerable<(string, TextReader)> files = 
         o.Files.Select(f => (Path.GetFileNameWithoutExtension(f), (TextReader) new StreamReader(f)));
 
@@ -116,11 +115,13 @@ void CompileFiles(Options o, Translator tr) {
             EmitFunctionCall(tr, name);
         EmitFunctionEnding(tr);
     }
+    */
 }
 
 void CompileTo(Options o) {
 
-    Translator tr = new(new StringBuilder(), new StringBuilder(),  setLineC, getNextWordC, getTosStringC);
+    /*
+    Translator tr = new(ImmutableList.Create<Word>(), new Code("", ""), Status.Executing, ImmutableList.Create<Word>(), null, null, 0);
 
     CompileFiles(o, tr);
 
@@ -135,8 +136,10 @@ void CompileTo(Options o) {
     sb.Append("\n}");
     File.WriteAllText(o.Output, sb.ToString());
     WriteLine(" done.");
+    */
 }
 
+/*
 void ProcessReader(TextReader reader, Translator tr) {
 
     while(true) {
@@ -188,21 +191,36 @@ async Task InterpretFiles(Options o, Translator tr) {
         }
     }
 }
+*/
+string GetNextWord(char c) {
+    if(script == null) throw new Exception("Script cannot be null");
+    script = script.ContinueWithAsync($"return VmExt.nextword(ref vm, '{c}');").Result;
+    var w = (string)script.ReturnValue; 
+    return w;
+};
+void ExecuteDebug (Code code) {
+    if(script == null) throw new Exception("Script cannot be null");
+    if(Debug) WriteLine(code.ToString());
+    Execute(code);
+};
+void Execute (Code code) {
+    script = script.ContinueWithAsync(code.Declarations + code.Statements).Result;
+};
 
 async Task Interpret(Options o) {
 
-    Translator tr = new(new StringBuilder(), new StringBuilder(), setLine, getNextWord, getTosString);
+    Translator tr = Create(GetNextWord, ExecuteDebug);
 
     InitEngine(tr, o);
 
     if(script == null) throw new Exception("InitEngine failed.");
 
-    await InterpretFiles(o, tr);
+    //await InterpretFiles(o, tr);
 
     if(o.Exec != null) {
         Write("Interpreting Exec instruction. Please wait ...");
-        TranslateLine(tr, o.Exec);
-        script     = await script.ContinueWithAsync(FlashStatements(tr));
+        setLine(o.Exec);
+        tr = tr.Translate();
         WriteLine(" done.");
     }
 
@@ -214,12 +232,12 @@ async Task Interpret(Options o) {
 
         WriteLine("Say 'bye' to exit. No output means all good.");
 
-        var debug     = false;
 
         System.ReadLine.HistoryEnabled = true;
 
         // Trying to remove a delay in the first execution by 'priming the pump'.
-        tr.setLine("1 drop");
+        setLine("1 drop");
+        tr = tr.Translate();
 
         while(true) {
 
@@ -233,36 +251,23 @@ async Task Interpret(Options o) {
 
                 var lowerLine = line.Trim().ToLowerInvariant();
 
-                if(lowerLine == "debug") { debug = !debug; continue;}
+                if(lowerLine == "debug") { Debug = !Debug; continue;}
 
-                tr.setLine(line);
+                setLine(line);
+                tr = tr.Translate();
 
-                while(true) {
-                    var word = tr.NextWord();
-                    if(word == null) break;
-
-                    TranslateWord(word, tr);
-
-                    var newDeclarations = FlashDeclarations(tr);
-                    var newStatements = FlashStatements(tr);
-
-                    if(debug) {
-                        Console.WriteLine($"\n{newDeclarations}");
-                        Console.WriteLine($"\n{newStatements}");
-                    }
-
-                    script = await script.ContinueWithAsync(
-                        newDeclarations + newStatements);
-                }
                 // This is excedingly clever. It forces the input cursor to always be on the next
                 // line and the first position on the left.
                 if(CursorLeft != 0) Console.WriteLine();
 
             } catch(Exception e) {
                 ColorLine(ConsoleColor.Red, e.ToString());
-                tr.Reset();
+                tr = tr.Reset();
                 script = await script.ContinueWithAsync("vm.reset()");
+            } finally {
+                Execute(new Code("", "VmExt._dots(ref vm);"));
             }
+
         }
     } finally {
         ResetColor();
@@ -284,7 +289,7 @@ void InitEngine(Translator tr, Options o) {
     Write("Initializing. Please wait ...");
 
     var globals = new Globals { vm = vm };
-    var initCode = FlashStatements(tr);
+    var initCode = "";
 
     script = CSharpScript.RunAsync(
             initCode,
@@ -329,7 +334,7 @@ class AutoCompletionHandler : IAutoCompleteHandler
     }
 
     public AutoCompletionHandler(Translator tr) {
-        words = tr.words.Keys;
+        words = tr.Words.Select(w => w.Name);
     }
 }
 
