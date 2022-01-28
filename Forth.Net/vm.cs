@@ -64,7 +64,7 @@ public struct Vm
     // state: compiling -> true, interpreting -> false.
     public int state = 0;
 
-    public string lastCreatedWord = "";
+    public string x0 = "", x1 = "", x2 = "", x3 = "", x4 = "", x5 = "", x6 = "", x7 = "", x8 = "", x9 = "", x10 = "";
     // Base management.
     public int base_p;
 
@@ -458,6 +458,8 @@ public static partial class VmExt
 #endif
         vm.output.Write(' ');
     }
+    [RE] public static void bye(ref Vm vm) => System.Environment.Exit(0);
+
     [RE] public static void dump(ref Vm vm) {
         var n = popi(ref vm);
         var s = popi(ref vm);

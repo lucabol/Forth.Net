@@ -458,6 +458,8 @@ public static partial class VmExt
 #endif
         vm.output.Write(' ');
     }
+    [RE] public static void bye(ref Vm vm) => System.Environment.Exit(0);
+
     [RE] public static void dump(ref Vm vm) {
         var n = popi(ref vm);
         var s = popi(ref vm);

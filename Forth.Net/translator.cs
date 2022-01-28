@@ -17,15 +17,16 @@ public static partial class TranslatorExt
         Status Status = Status.Executing,
         Status LastStatus = Status.Executing,
         int FuncId = 0,
-        string LastDefinedWord = "");
+        string LastDefinedWord = "",
+        string LastCreatedWord = "");
 
     public abstract record Word (string Name);
-    public record Immediate     (string Name, Word Word)                    : Word(Name);
-    public record Verbatim      (string Name, string CodeText)              : Word(Name);
-    public record Primitive     (string Name, string PrimitiveName)         : Word(Name);
-    public record Grabbing      (string Name, char Separator)               : Word(Name);
-    public record FuncDef       (string Name, ImmutableList<Word> Defs)     : Word(Name);
-    public record FuncCall      (string Name, int FuncId)                   : Word(Name);
+    public record Immediate     (string Name, Word Word)                                : Word(Name);
+    public record Verbatim      (string Name, string CodeText)                          : Word(Name);
+    public record Primitive     (string Name, string PrimitiveName, string Param = "")  : Word(Name);
+    public record Grabbing      (string Name, char Separator)                           : Word(Name);
+    public record FuncDef       (string Name, ImmutableList<Word> Defs)                 : Word(Name);
+    public record FuncCall      (string Name, int FuncId)                               : Word(Name);
 
     public record Compile       (string Name, Func<Translator, Translator> CompileFunction) : Word(Name);
 
@@ -101,11 +102,10 @@ public static partial class TranslatorExt
     static Translator EmitFuncEnd(this Translator tr, FuncDef fd) => tr.EmitString("\n}\n");
 
     static Translator EmitPrimitive(this Translator tr, Primitive pr)
-        => tr.EmitString($"VmExt.{pr.PrimitiveName}(ref vm);");
-    static Translator EmitPrimitive(this Translator tr, Primitive pr, string str)
-        => tr.EmitString($"VmExt.{pr.PrimitiveName}(ref vm, \"{str}\");");
+        => tr.EmitString(
+            $"VmExt.{pr.PrimitiveName}(ref vm{(!string.IsNullOrEmpty(pr.Param) ? $", \"{pr.Param}\"" : "")});");
 
-    static Translator EmitFuncDef  (this Translator tr, FuncDef fd)
+    static Translator EmitFuncDef(this Translator tr, FuncDef fd)
         => (tr.ToCompiling().EmitFuncPre(fd).EmitFuncBody(fd).EmitFuncEnd(fd).ToOldStatus() with
         {
             Words  = tr.Words.Add(new FuncCall(fd.Name, tr.FuncId)),
@@ -113,7 +113,7 @@ public static partial class TranslatorExt
         })
         .EmitFuncCall(new FuncCall(fd.Name, tr.FuncId));
 
-    static Translator EmitFuncCall (this Translator tr, FuncCall fc) =>
+    static Translator EmitFuncCall(this Translator tr, FuncCall fc) =>
         tr.EmitString($"{ToCsharpId(fc.Name, fc.FuncId)}(ref vm);");
 
     static Translator EmitImmediate(this Translator tr, Immediate word) =>

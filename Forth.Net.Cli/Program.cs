@@ -231,13 +231,7 @@ async Task Interpret(Options o) {
         };
 
         WriteLine("Say 'bye' to exit. No output means all good.");
-
-
         System.ReadLine.HistoryEnabled = true;
-
-        // Trying to remove a delay in the first execution by 'priming the pump'.
-        setLine("1 drop");
-        tr = tr.Translate();
 
         while(true) {
 
@@ -263,7 +257,7 @@ async Task Interpret(Options o) {
             } catch(Exception e) {
                 ColorLine(ConsoleColor.Red, e.Message.ToString());
                 if(e.InnerException is IndexOutOfRangeException)
-                    ColorLine(ConsoleColor.Red, "Likely stack underflow. Did you enough iterms on the stack?");
+                    ColorLine(ConsoleColor.Red, "Likely stack underflow. Did you have enough iterms on the stack?");
                 tr = tr.Reset();
                 script = await script.ContinueWithAsync("vm.reset()");
             } finally {

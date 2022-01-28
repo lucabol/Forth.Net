@@ -2,24 +2,29 @@
 
 public static partial class TranslatorExt
 {
-    static Translator LoadStartingWords(this Translator tr)
-    {
-        Verbatim print = new(".", "vm.output.Write($\"{VmExt.pop(ref vm)} \");");
-        Verbatim bye = new("bye", "System.Environment.Exit(0);");
+    static Translator LoadStartingWords(this Translator tr) =>  tr with { Words = InitialWords };
 
-        return tr with {
-            Words = InitialWords.Add(print).Add(bye).Add(new Compile(":", Colon)).Add(new Immediate(";", new Compile(";", SemiColon)))
-        };
-    }
-    static Translator Colon(Translator tr) {
+    static Translator ColonDef(Translator tr) {
         var v = tr.NextWord(' ');
-        return (tr.ToCompiling() with
+        return (tr with
             {
                 LastDefinedWord = v,
                 Defs = ImmutableList.Create<Word>()
             })
             .ToExecuting()
-            .EmitPrimitive(new Primitive("", "_labelHere"), v)
+            .EmitPrimitive(new Primitive("", "_labelHere", v))
+            .ToCompiling();
+    }
+    static Translator CreateDef(Translator tr) {
+        var v = tr.NextWord(' ');
+        return (tr with
+            {
+                LastCreatedWord = v,
+                Words = tr.Words.Add(new Primitive(v, $"_pushLabel", v))
+            })
+            .EmitWord(new Verbatim("", "VmExt._pushLabel(ref vm, vm.lastCreatedWord);"))
+            .ToExecuting()
+            .EmitPrimitive(new Primitive("", "_labelHere", v))
             .ToOldStatus();
     }
     static Translator SemiColon(Translator tr) => (tr with
@@ -57,6 +62,7 @@ public static partial class TranslatorExt
              PrimitiveF("bl", "bl"),
              PrimitiveF("nl", "nl"),
              PrimitiveF(".s", "_dots"),
+             PrimitiveF(".", "_dot"),
              PrimitiveF("dump", "dump"),
              PrimitiveF("?dup", "_qdup"),
              PrimitiveF("depth", "depth"),
@@ -72,10 +78,14 @@ public static partial class TranslatorExt
              PrimitiveF("blank", "blank"),
              PrimitiveF("erase", "erase"),
              PrimitiveF("u.r", "urdot"),
-
              PrimitiveF("_labelHere", "_labelHere"),
              PrimitiveF("key", "_key"),
              PrimitiveF(">in", "inpp"),
-   
+             PrimitiveF("bye", "bye"),
+
+             new Compile(":", ColonDef),
+             new Compile("create", CreateDef),
+             new Immediate(";", new Compile(";", SemiColon)),  
+
     }).ToImmutableList();
 }
