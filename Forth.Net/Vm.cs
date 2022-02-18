@@ -147,41 +147,41 @@ public class Vm {
     MethodInfo? lastMethod;
 
     public Vm(
-        Index maxParameterStack = Config.SmallStack,
-        Index maxReturnStack    = Config.SmallStack,
-        Index maxDataStack      = Config.SmallStack,
-        Index maxStrings        = 128,
-        Index maxPad            = 1_024,
-        Index maxSource         = 1_024,
-        Index maxWord           = 128
+        Index parameterStackSize = Config.SmallStack,
+        Index returnStackSize    = Config.SmallStack,
+        Index dataStackSize      = Config.MediumStack,
+        Index stringsSize        = 1_024,
+        Index padSize            = 1_024,
+        Index sourceSize         = 1_024,
+        Index wordSize           = 1_024
         ) {
 
-        ps   = new AUnit[maxParameterStack];
-        rs   = new AUnit[maxReturnStack];
-        ds   = new AUnit[maxDataStack];
+        ps   = new AUnit[parameterStackSize];
+        rs   = new AUnit[returnStackSize];
+        ds   = new AUnit[dataStackSize];
 
         code          = herep;
         herep        += CHAR_SIZE + CELL_SIZE;
 
         keyWord       = herep;
-        herep        += maxWord * CHAR_SIZE;
+        herep        += wordSize * CHAR_SIZE;
         source        = herep;
-        herep        += maxSource * CHAR_SIZE;
+        herep        += sourceSize * CHAR_SIZE;
 
         word          = herep;
-        herep        += maxWord * CHAR_SIZE;
+        herep        += wordSize * CHAR_SIZE;
 
         pad              = herep;
-        herep           += maxPad;
-        source_max_chars = maxSource;
-        word_max_chars   = maxWord;
+        herep           += padSize;
+        source_max_chars = sourceSize;
+        word_max_chars   = wordSize;
 
         base_p     = herep;
         herep    += CELL_SIZE;
         ds[base_p] = 10;
 
         strings = herep;
-        herep += maxStrings * Vm.CHAR_SIZE;
+        herep += stringsSize * Vm.CHAR_SIZE;
 
         inp     = herep;
         herep += CELL_SIZE;

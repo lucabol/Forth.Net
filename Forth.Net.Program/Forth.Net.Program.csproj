@@ -35,6 +35,6 @@
 		<Description>Forth for .Net (library, CLI and Interpret).</Description>
 		<Copyright>2020 Ⓒ Luca Bolognese </Copyright>
 		<Authors>Luca Bolognese</Authors>
-		<VersionPrefix>2.0.2</VersionPrefix>	
+		<VersionPrefix>2.0.3</VersionPrefix>	
 	</PropertyGroup>
 </Project>

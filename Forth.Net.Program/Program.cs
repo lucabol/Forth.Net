@@ -6,8 +6,8 @@ using CommandLine.Text;
 
 var verbose      = false;
 Options? options = null;
+Vm? vm            = null;
 
-Vm vm = new();
 var parser       = new CommandLine.Parser(with => with.HelpWriter = null);
 var parserResult = parser.ParseArguments<Options>(args);
 parserResult
@@ -18,6 +18,10 @@ void Run(Options o) {
 
     options = o;
     verbose = options.Verbose;
+
+    vm = new Vm(parameterStackSize: o.ParamSize,
+                returnStackSize   : o.ReturnSize,
+                dataStackSize     : o.DictSize);
 
     foreach (var fileName in o.Files)
         InterpretFile(fileName);
@@ -140,4 +144,20 @@ class Options {
 
     [Option('s', "hidestack", Required = false, HelpText = "Hides the stack banner.")]
     public bool HideStack {get; set;} = false;
+
+    [Option('d', "dictsize", Required = false, HelpText = "Size of the words dictionary in bytes.")]
+    public int DictSize {get; set;} = Config.MediumStack;
+
+    [Option('p', "paramsize", Required = false, HelpText = "Size of the parameter stack in bytes.")]
+    public int ParamSize {get; set;} = Config.SmallStack;
+
+    [Option('r', "returnsize", Required = false, HelpText = "Size of the return stack in bytes.")]
+    public int ReturnSize {get; set;} = Config.SmallStack;
+}
+
+static class Config {
+    const int K                  = 1_024;
+    public const int SmallStack  = 16    * K;
+    public const int MediumStack = 256   * K;
+    public const int LargeStack  = 1_024 * K;
 }

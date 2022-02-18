@@ -53,7 +53,7 @@ public class UnitTest1
     [Fact]
     public void ResizeStackWorks()
     {
-        Vm vm = new(maxParameterStack: 10);
+        Vm vm = new(parameterStackSize: 10);
         for (long i = 0; i < 20; i++)
             vm.Push(i);
         for (long i = 19; i >= 0; i--)
