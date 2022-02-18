@@ -6,7 +6,7 @@ You can use it as a C# library, interactively with a CLI or compile the code to 
 ## Installation
 
 ```console
-dotnet tool install -g forth.net.cli
+dotnet tool install -g forth.net.program
 ```
 
 ## Usage

@@ -7,6 +7,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		Makefile = Makefile
 		pushrelease.bat = pushrelease.bat
+		Readme.md = Readme.md
 	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Forth.Net", "Forth.Net\Forth.Net.csproj", "{20C53113-4B73-4F50-8CF3-99B67125834A}"
