@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.32126.317
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LForth.Net.Tests", "LForth.Net.Tests\LForth.Net.Tests.csproj", "{F97F9308-6182-44FA-9CC9-2B0E9ACFC687}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{DD16B5E2-3EBE-4AC9-81BB-FBD02D8BEF9E}"
 	ProjectSection(SolutionItems) = preProject
 		Makefile.txt = Makefile.txt
@@ -15,16 +13,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forth.Net", "Forth.Net\Fort
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forth.Net.Program", "Forth.Net.Program\Forth.Net.Program.csproj", "{5126E38C-FB20-43A1-A819-8E69C6CC2183}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forth.Net.Tests", "Forth.Net.Tests\Forth.Net.Tests.csproj", "{319A63E6-ACAB-4224-899A-F1CD033CE85D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{F97F9308-6182-44FA-9CC9-2B0E9ACFC687}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F97F9308-6182-44FA-9CC9-2B0E9ACFC687}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F97F9308-6182-44FA-9CC9-2B0E9ACFC687}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F97F9308-6182-44FA-9CC9-2B0E9ACFC687}.Release|Any CPU.Build.0 = Release|Any CPU
 		{20C53113-4B73-4F50-8CF3-99B67125834A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{20C53113-4B73-4F50-8CF3-99B67125834A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{20C53113-4B73-4F50-8CF3-99B67125834A}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -33,6 +29,10 @@ Global
 		{5126E38C-FB20-43A1-A819-8E69C6CC2183}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5126E38C-FB20-43A1-A819-8E69C6CC2183}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5126E38C-FB20-43A1-A819-8E69C6CC2183}.Release|Any CPU.Build.0 = Release|Any CPU
+		{319A63E6-ACAB-4224-899A-F1CD033CE85D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{319A63E6-ACAB-4224-899A-F1CD033CE85D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{319A63E6-ACAB-4224-899A-F1CD033CE85D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{319A63E6-ACAB-4224-899A-F1CD033CE85D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
