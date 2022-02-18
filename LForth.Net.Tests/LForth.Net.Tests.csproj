@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LForth.Net\LForth.Net.csproj" />
+    <ProjectReference Include="..\Forth.Net\Forth.Net.csproj" />
   </ItemGroup>
 
 </Project>
