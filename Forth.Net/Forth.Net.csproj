@@ -11,4 +11,10 @@
     <PackageReference Include="GitVarInt" Version="0.1.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="init.fth">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

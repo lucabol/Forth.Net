@@ -5,15 +5,15 @@ VisualStudioVersion = 17.0.32126.317
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{DD16B5E2-3EBE-4AC9-81BB-FBD02D8BEF9E}"
 	ProjectSection(SolutionItems) = preProject
-		Makefile.txt = Makefile.txt
+		Makefile = Makefile
 		pushrelease.bat = pushrelease.bat
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forth.Net", "Forth.Net\Forth.Net.csproj", "{20C53113-4B73-4F50-8CF3-99B67125834A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Forth.Net", "Forth.Net\Forth.Net.csproj", "{20C53113-4B73-4F50-8CF3-99B67125834A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forth.Net.Program", "Forth.Net.Program\Forth.Net.Program.csproj", "{5126E38C-FB20-43A1-A819-8E69C6CC2183}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Forth.Net.Program", "Forth.Net.Program\Forth.Net.Program.csproj", "{5126E38C-FB20-43A1-A819-8E69C6CC2183}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Forth.Net.Tests", "Forth.Net.Tests\Forth.Net.Tests.csproj", "{319A63E6-ACAB-4224-899A-F1CD033CE85D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Forth.Net.Tests", "Forth.Net.Tests\Forth.Net.Tests.csproj", "{319A63E6-ACAB-4224-899A-F1CD033CE85D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

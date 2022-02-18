@@ -21,7 +21,7 @@ global using System.Numerics;
 global using GitVarInt;
 
 
-[assembly:InternalsVisibleTo("LForth.Net.Tests")]
+[assembly:InternalsVisibleTo("Forth.Net.Tests")]
 
 namespace Forth;
 
