@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "NoArgs": {
+      "commandName": "Project"
+    },
+    "File": {
+      "commandName": "Project",
+      "commandLineArgs": "prelimtest.fth -e bye"
+    }
+  }
+}

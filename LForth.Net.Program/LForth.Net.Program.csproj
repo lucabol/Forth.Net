@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LForth.Net\LForth.Net.csproj" />
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
+    <PackageReference Include="ReadLine" Version="2.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="init.fth">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="prelimtest.fth">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<PropertyGroup>
+		<PackAsTool>true</PackAsTool>
+		<ToolCommandName>nforth</ToolCommandName>
+		<PackageOutputPath>./nupkg</PackageOutputPath>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<Description>Forth for .Net (library, CLI and Interpret).</Description>
+		<Copyright>2020 Ⓒ Luca Bolognese </Copyright>
+		<Authors>Luca Bolognese</Authors>
+		<VersionPrefix>2.0.00</VersionPrefix>	
+	</PropertyGroup>
+</Project>
