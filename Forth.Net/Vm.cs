@@ -1,10 +1,5 @@
 namespace Forth;
 
-using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
-using static Forth.Utils;
-
-
 public enum Op {
     Error , Colo,  Does, Plus, Minu, Mult, Divi, Prin, Base, Noop,
     Count, Word, Parse, Refill, Comma, CComma, Here, At, Store, State, Bl, Dup, Exit, Immediate,
@@ -26,11 +21,9 @@ public class Vm {
     /** Enable debug to see the generated opcodes **/
     public bool Debug { get ; set; }
 
-    /** Forth true and false bizarre definition. **/
-    const Cell TRUE  = -1;
-    const Cell FALSE = 0;
+    const Cell FORTH_TRUE  = -1;
+    const Cell FORTH_FALSE = 0;
 
-    /** Sizes of data types. **/
     internal const Index CHAR_SIZE = 1;
     internal const Index CELL_SIZE = sizeof(Cell);
 
@@ -52,8 +45,8 @@ public class Vm {
 
     /** State TRUE when compiling, FALSE when interpreting. **/
     readonly Index state;
-    bool Executing { get => ReadCell (ds, state) == FALSE;
-                     set => WriteCell(ds, state, value ? FALSE : TRUE);}
+    bool Executing { get => ReadCell (ds, state) == FORTH_FALSE;
+                     set => WriteCell(ds, state, value ? FORTH_FALSE : FORTH_TRUE);}
 
     Index sp     = 0;
     Index rp     = 0;
@@ -311,7 +304,7 @@ public class Vm {
         try { 
             NextLine = () => s;
             Refill();
-            if(Pop() == TRUE)
+            if(Pop() == FORTH_TRUE)
                 Interpret();
         } finally
         {
@@ -328,7 +321,7 @@ public class Vm {
         while(true)
         {
             Refill();
-            if(Pop() == TRUE)
+            if(Pop() == FORTH_TRUE)
                 Interpret();
             else
                 break;
@@ -457,7 +450,7 @@ public class Vm {
         // Look for user defined word
         var caddr = (Index)Peek();
         FindUserDefinedWord();
-        var found = Peek() != FALSE;
+        var found = Peek() != FORTH_FALSE;
         if(found) return;
 
         var clen  = ds[caddr];
@@ -561,7 +554,7 @@ public class Vm {
         var res = Pop();
         var xt    = (Index)Pop();
 
-        if(res != FALSE) {
+        if(res != FORTH_FALSE) {
             PushOp(Op.IPostponeCall, xt);
             return;
         }
@@ -592,7 +585,7 @@ public class Vm {
         var xt    = (Index)Pop();
 
         // Manage user defined word.
-        if(res != FALSE)
+        if(res != FORTH_FALSE)
         {
             var immediate = res == 1;
             if(Executing || immediate)
@@ -902,16 +895,16 @@ public class Vm {
                     Push(Pop() * Pop());
                     break;
                 case Op.Less:
-                    Push(Pop() > Pop() ? TRUE : FALSE);
+                    Push(Pop() > Pop() ? FORTH_TRUE : FORTH_FALSE);
                     break;
                 case Op.More:
-                    Push(Pop() < Pop() ? TRUE : FALSE);
+                    Push(Pop() < Pop() ? FORTH_TRUE : FORTH_FALSE);
                     break;
                 case Op.Equal:
-                    Push(Pop() == Pop() ? TRUE : FALSE);
+                    Push(Pop() == Pop() ? FORTH_TRUE : FORTH_FALSE);
                     break;
                 case Op.NotEqual:
-                    Push(Pop() != Pop() ? TRUE : FALSE);
+                    Push(Pop() != Pop() ? FORTH_TRUE : FORTH_FALSE);
                     break;
                 case Op.Depth:
                     Push(sp / CELL_SIZE);
@@ -983,7 +976,7 @@ public class Vm {
                     break;
                 case Op.Branch0:
                     flag = Pop();
-                    ip += flag == FALSE ? ReadInt16(ds, ip) : 2 ;
+                    ip += flag == FORTH_FALSE ? ReadInt16(ds, ip) : 2 ;
                     break;
                 case Op.Do:
                     RPush(ReadCell(ds, ip));
@@ -1082,7 +1075,7 @@ public class Vm {
 
         if (inputBuffer == null)
         {
-            Push(FALSE);
+            Push(FORTH_FALSE);
         }
         else
         {
@@ -1095,7 +1088,7 @@ public class Vm {
             var bytes = new Span<byte>(Encoding.UTF8.GetBytes(inputBuffer));
             bytes.CopyTo(inputCharSpan);
             WriteCell(ds, inp, 0);
-            Push(TRUE);
+            Push(FORTH_TRUE);
         }
     }
     internal void Source()

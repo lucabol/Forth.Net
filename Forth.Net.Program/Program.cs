@@ -59,9 +59,9 @@ static void DisplayHelp<T>(ParserResult<T> result, IEnumerable<Error> errs)
   var helpText = HelpText.AutoBuild(result, h =>
   {
     h.AdditionalNewLineAfterOption = false;
-    h.AddPreOptionsLine("Usage: lforth [Forth files] [Options]");
+    h.AddPreOptionsLine("Usage: nforth [Forth files] [Options]");
     h.AddPostOptionsText
-        ("EXAMPLES:\n\tlforth\n\tlforth Test1.fth Test2.fth -e bye\n\tlforth Test1.fth Test2.fth -o Forth.fim");
+        ("EXAMPLES:\n\nforth\n\nforth Test1.fth Test2.fth -e bye\n\nforth Test1.fth Test2.fth -o Forth.fim");
     return HelpText.DefaultParsingErrorsHandler(result, h);
   }, e => e);
 
