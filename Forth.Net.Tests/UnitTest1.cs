@@ -87,8 +87,8 @@ public class UnitTest1
         while(true)
         {
             vm.Push(' ');
-            vm.WordW();
-            if(vm.IsEmptyWordC()) { vm.Drop(); break;};
+            vm.Word();
+            if(vm.IsEmptyWord()) { vm.Drop(); break;};
             Assert.Equal(words[i], vm.ToDotNetStringC());
             i++;
         }
@@ -123,7 +123,7 @@ public class UnitTest1
 
         foreach(var w in words) {
             vm.Bl();
-            vm.WordW();
+            vm.Word();
             vm.DictAdd();
         }
         vm.Refill();
@@ -132,7 +132,7 @@ public class UnitTest1
         foreach(var w in words)
         {
            vm.Bl();
-           vm.WordW();
+           vm.Word();
            vm.FindUserDefinedWord();
            Assert.Equal(-1, vm.Pop());
            vm.Drop(); // Dropping the xt

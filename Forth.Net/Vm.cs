@@ -1,65 +1,140 @@
 namespace Forth;
 
-public enum Op {
-    Error , Colo,  Does, Plus, Minu, Mult, Divi, Prin, Base, Noop,
-    Count, Word, Parse, Refill, Comma, CComma, Here, At, Store, State, Bl, Dup, Exit, Immediate,
-    Swap, Dup2, Drop, Drop2, Find, Bye, DotS, Interpret, Quit, Create, Body, RDepth, Depth,
-    Less, More, Equal, NotEqual, Do, Loop, LoopP, ToR, FromR, I, J, Leave, Cr,
-    Source, Type, Emit, Char, In, Over, And, Or, Allot, Cells, Exec, Invert, MulDivRem,
-    Save, Load, SaveSys, LoadSys, Included, DType, DCall, DMethod, CAt, Pad,
-    IDebug, ISemi,  IBegin, IDo, ILoop, ILoopP, IAgain, IIf, IElse, IThen,
-    IWhile, IRepeat, IBrakO, IBrakC,   // End of 1 byte
-    Branch0, RelJmp, ImmCall, IPostponeOp,// End of 2 byte size
-    NumbEx, // End of CELL Size 
-    Jmp , Numb, Call, IPostponeCall, ILiteral, IChar,// End of Var number
-    ICStr, ISStr, ISLit, // End of string words
-    FirstHasVarNumb = Jmp, FirstHas2Size = Branch0, FirstHasCellSize = NumbEx,
-    FirstStringWord = ICStr,
-}
-
 public class Vm {
-    /** Enable debug to see the generated opcodes **/
-    public bool Debug { get ; set; }
 
-    const Cell FORTH_TRUE  = -1;
-    const Cell FORTH_FALSE = 0;
+    /** In Forth everything starts at `Quit`. Yep. It is the line interpreter. It reads a line (with `Refill`) and interprets it. **/
+    public void Quit()
+    {
+        rp = 0; Executing = true; ds[inp] = 0; // Don't reset the parameter stack as for ANS FORTH definition of QUIT.
 
-    internal const Index CHAR_SIZE = 1;
-    internal const Index CELL_SIZE = sizeof(Cell);
+        while(true)
+        {
+            Refill();
+            if(Pop() != FORTH_TRUE) return;
+            Interpret();
+        }
+    }
 
-    readonly Index source;
-    readonly Index keyWord;
-    readonly Index word;
-    readonly Index inp;
-    readonly Index source_max_chars;
-    readonly Index word_max_chars;
-    readonly Index pad;
-    readonly Index strings;
+    /** Then comes the word interpret. It tries to interpret the text between spaces first as a word, then as a number **/
+    void Interpret()
+    {
+        while(true)
+        {
+            Bl();
+            Word(inKeyword: true);
+            if(IsEmptyWord()) { Drop(); break;};
 
-    private readonly int userStart;
+            // TODO: remove string allocation from main loop. It is not trivial to do, because some functions inside InterpretWord rely on it.
+            Dup();
+            var aword = ToDotNetStringC().ToLowerInvariant();
 
-    Index input_len_chars = 0;
+            if(InterpretWord(aword)) continue;
 
-    /** This is the base to interpret numbers. **/
-    readonly Index base_p;
+            if(TryParseNumber(aword, out Cell n))
+                InterpretNumber(n);
+            else
+                Throw($"{aword} is not a recognized word or number.");
+        }
+    }
 
-    /** State TRUE when compiling, FALSE when interpreting. **/
-    readonly Index state;
-    bool Executing { get => ReadCell (ds, state) == FORTH_FALSE;
-                     set => WriteCell(ds, state, value ? FORTH_FALSE : FORTH_TRUE);}
+    /** Let's tackle parsing the number first. In Forth you can express numbers in different basis. We use the standard .NET conversion
+        functions here, but those support just a few basis and throw exceptions on failure (bad design). We could consider writing our own to support all basis.
+        Also the code can be compiled for 32 bits cell size and maybe it works. **/
+    bool TryParseNumber(string s, out Cell n)
+    {
+        var b = ds[basep];
 
-    Index sp     = 0;
-    Index rp     = 0;
-    Index herep  = 0;
-    AUnit[] ps;
-    AUnit[] rs;
-    AUnit[] ds;
-    readonly Index savedDictHead;
-    readonly Index code = 0;
+        try {
+#if CELL32
+            n = Convert.ToInt32(s, b);
+#else
+            n = Convert.ToInt64(s, b);
+#endif
+            return true;
+        } catch (FormatException )
+        {
+            // This is not acturally an exception case in Forth.
+            n = 0;    
 
-    Index dictHead;
+        } catch(OverflowException)
+        {
+            throw;
+        }
+        return false;
+    }
 
-    /** There are some words that directly maps to single opcodes **/
+    /** Now that we can parse a number, we can interpret it. This is a token interpreter. Word as described as tokens of various kind. You are either executing
+        a token, or compiling it inside of another word (i.e., when using the defining word `:`). **/
+    void InterpretNumber(Cell value)
+    {
+        if(Executing)
+            Execute(Op.Numb, value);
+        else
+            PushOp(Op.Numb, value);
+    }
+
+    /** Executing a token is a bit complicated. Let's look first at compiling it. Compilation in this model means adding a token on top of the data stack.
+        In Forth, the data stack is where user defined words live and we are in the middle of defining one. **/
+    void PushOp(Op op) {
+        ds[herep] = (Code)op;
+        herep++;
+    }
+    /** Sometimes tokens have parameters. If they have a numeric one, we encode it so to minimize the overall size both in memory (for cache sake) and on disk.
+        For that we use the [GitVarInt](https://www.nuget.org/packages/GitVarInt/) library. **/
+    void PushOp(Op op, Cell value)
+    {
+        PushOp(op);
+        Write7BitEncodedCell(ds, herep, value, out var howMany);
+        herep += howMany;
+    }
+
+    /** Now that we know how to compile numbers and then it exists a magic function that executes tokens, we can go back and look at interpreting words.
+        In this implementation, words are separated in user defined words, primitives and immediate primitive. This is likely a bad design brought about
+        by a desire of optimize prematurely. There should be an unified representation.
+    
+        The logic is still relatively simple. If it is a user defined word, execute/compile a call token with its address. If it is a primitive,
+        execute/compile the corresponding token. If it is an immediate primitive, execute the code associated with it.
+
+        It is awkward that finding the user defined word relies on parameters on the stack, while the other cases use a .net string representation to find
+        the token in an hashtable. Apart from style, this is an irritating allocation in the main loop that could be optimized away with some work.
+     **/
+    bool InterpretWord(string aword)
+    {
+        LowerCase();
+        FindUserDefinedWord();
+
+        var found   = Pop();
+        var xt      = (Index)Pop();
+
+        // Manage user defined word.
+        if(found != FORTH_FALSE)
+        {
+            var immediate = found == 1; // There can be user defined immediate functions.
+            if(Executing || immediate)
+                Execute(Op.Call, xt);
+            else
+                PushOp(Op.Call, xt);
+            return true;
+        }
+        // Manage simple primitives.
+        if(WordToSimpleOp.TryGetValue(aword, out var op))
+        {
+            if(Executing)
+                Execute(op, null);
+            else
+                PushOp(op);
+            return true;
+        }
+        // Manage immediate primitives.
+        if(ImmediatePrimitives.TryGetValue(aword, out var immediateWord))
+        {
+            immediateWord.Item2();
+            return true;
+        }
+        return false;
+    }
+
+    /** Simple primitives map a word with the token defining it. **/
     readonly Dictionary<string, Op> WordToSimpleOp = new()
     {
         { "."           , Op.Prin },
@@ -132,8 +207,102 @@ public class Vm {
         { ".net>call"   , Op.DCall },
     };
 
-    /** While other words need to perfom more complicated actions at compile time **/
-    readonly Dictionary<string, (Op, Action)> ImmediateWords = new();
+    /** On the other hand, immediate actions need to be executed at compile time when their token is encountered.
+        This is indexed by the string word, which is what we see in the interpreter. But later I discovered the need
+        to index it by operator as well, so I goofly bolted it on as a tuple. We'll look in more depth at how they work later. **/
+    readonly Dictionary<string, (Op, Action)> ImmediatePrimitives = new();
+
+    /** User defined words are stored in the data space as a linked list. Each word is in the format:
+        -> Cell   <-> One Byte <-> Bytes    <-> Bytes
+        | Next Link|  Len Word  | Word chars | Tokens |
+        This function follow the links, staring at `dictHead`, until it finds the word on top of the parameter stack.
+        As an optimization, the length field uses the higher bit to store if the word is an immediate one (save one byte, save the planet). **/
+    internal void FindUserDefinedWord()
+    {
+        var caddr = (Index)Pop();
+        var clen  = ds[caddr];
+        var cspan = new Span<AChar>(ds, caddr + 1 * CHAR_SIZE, clen);
+
+        var dp = dictHead;
+
+        while(true)
+        {
+            if(dp == 0) break;
+
+            var wordNameStart = dp + CELL_SIZE;
+            var wordLenRaw    = ds[wordNameStart];
+            var wordLen       = Utils.ResetHighBit(wordLenRaw); // Resets the high bit, so we get the real length.
+            var wordSpan      = new Span<AChar>(ds, wordNameStart + 1 * CHAR_SIZE, wordLen);
+            var found         = cspan.SequenceEqual(wordSpan);
+            if(found)
+            {
+                Push(LinkToCode(dp, wordLen));                
+                var isImmediate = Utils.HighBitValue(wordLenRaw) == 1;
+                Push( isImmediate ? 1 : -1);
+                return;
+            }
+            dp = (Index)ReadCell(ds, dp);
+        }
+        // Not found
+        Push(caddr);
+        Push(0);
+    }
+
+    /** These functions abstract out the details of the word structure. At least that was the idea. In practice that knowledge has leaked
+        in other parts of the codebase. **/
+    static Index LinkToCode(Index link, Index wordLen)
+        // Addr + Link size + len size  + word chars
+        => link + CELL_SIZE + CHAR_SIZE + CHAR_SIZE * wordLen;
+
+    static Index LinkToLen(Index link) => link + CELL_SIZE;
+
+    /** As we touched on the internal memory organization, it might now be time to describe it in more detail. Firstly the data space, parameter stack and
+        return stack are represented as arrays of bytes. Some notes:
+        * In Forth, you can access the stacks as Cells or bytes. I choose the lower denominator to simplify things.
+        * I didn't use the .NET `Stack` class because it doesn't let you easily index into it.
+        * One could use `unsafe` and pointers to avoid checking boundaries at each access, but then you could use the library just from unsafe code.
+        **/
+
+    Index sp     = 0;                   // Top of parameter stack.
+    Index rp     = 0;                   // Top for return stack.
+    Index herep  = 0;                   // Top of data space.
+    AUnit[] ps;                         // Parameter stack.
+    AUnit[] rs;                         // Return stack.
+    AUnit[] ds;                         // Data space.
+
+    /** Then come some pointers that delimitate areas in the data space that are used by the system or point to some system cells.
+        They get initialized in the Vm constructor. Also, some other random state used by the system. **/
+
+    Index dictHead;                     // The last word added to the dictionary.
+
+    readonly Index source;              // Input buffer.
+    readonly Index inp;                 // Points char number (0...source_max_chars) to be read in the input buffer.
+    readonly Index inputBufferSize;     // Size of the input buffer.
+    readonly Index keyWord;             // Word read by the interpreter.
+    readonly Index word;                // Text read by the Forth word `word`. It needs to be separated from keyWord, so as to not conflict.
+    readonly Index wordBufferSize;      // Size of the `word` and `keyword` buffer.
+    readonly Index pad;                 // Pad area. A temporary area usable by the user.
+    readonly Index dotnetStrings;       // Area used to store string parameters passed from dotnet to Forth. 
+    readonly Index code;                // Each token needs to be stored in the data space before execution, so that the instruction pointer can work.
+    readonly Index basep;               // Store base for numbers.
+    readonly Index state;               // Are we compiling or interpreting? See `Executing` below.
+    readonly Index userStart;           // Start of the user part of the data space. `Save` starts saving from here.
+    readonly Index savedDictHead;       // Used by `save` and `load` to fetch the index of the last word in the dictionary.
+
+    Index input_len_chars = 0;          // How many chars in the input buffer.
+
+    bool Executing { get => ReadCell (ds, state) == FORTH_FALSE;
+                     set => WriteCell(ds, state, value ? FORTH_FALSE : FORTH_TRUE);}
+
+    public bool Debug { get ; set; }    // Doesn't do much as of now, but we can extend it to print out a lot of useful thins (i.e., token disassembly).
+
+    internal const Index CHAR_SIZE = 1;
+    internal const Index CELL_SIZE
+                        = sizeof(Cell);
+
+    const Cell FORTH_TRUE  = -1;
+    const Cell FORTH_FALSE = 0;
+
     public Func<string>? NextLine = null;
 
     Type lastType = typeof(Console);
@@ -143,7 +312,7 @@ public class Vm {
         Index parameterStackSize = Config.SmallStack,
         Index returnStackSize    = Config.SmallStack,
         Index dataStackSize      = Config.MediumStack,
-        Index stringsSize        = 1_024,
+        Index stringsSize        = 270,
         Index padSize            = 1_024,
         Index sourceSize         = 1_024,
         Index wordSize           = 1_024
@@ -166,14 +335,14 @@ public class Vm {
 
         pad              = herep;
         herep           += padSize;
-        source_max_chars = sourceSize;
-        word_max_chars   = wordSize;
+        inputBufferSize = sourceSize;
+        wordBufferSize   = wordSize;
 
-        base_p     = herep;
+        basep     = herep;
         herep    += CELL_SIZE;
-        ds[base_p] = 10;
+        ds[basep] = 10;
 
-        strings = herep;
+        dotnetStrings = herep;
         herep += stringsSize * Vm.CHAR_SIZE;
 
         inp     = herep;
@@ -243,7 +412,7 @@ public class Vm {
             herep += len + 1;
         };}
 
-        ImmediateWords = new()
+        ImmediatePrimitives = new()
         {
             { "debug",      (Op.IDebug,     () => Debug = !Debug) },
             { "[char]",     (Op.IChar,      () => { Char(); PushOp(Op.Numb, Pop());}) },
@@ -312,30 +481,15 @@ public class Vm {
         }
 
     }
-    public void Quit()
-    {
-        rp = 0; Executing = true; ds[inp] = 0; // Don't reset the parameter stack as for ANS FORTH definition of QUIT.
-
-        if(NextLine is null) Throw("Trying to Quit with a null readline.");
-
-        while(true)
-        {
-            Refill();
-            if(Pop() == FORTH_TRUE)
-                Interpret();
-            else
-                break;
-        }
-    }
     public IEnumerable<string> Words()
     {
-        return WordToSimpleOp.Keys.Concat(ImmediateWords.Keys);
+        return WordToSimpleOp.Keys.Concat(ImmediatePrimitives.Keys);
     }
 
     // TODO: clean this up, it now works because the default value of Op is 0 -> Error. It should use some kind of multidictionary here.
     Action? ImmediateAction(Op op) {
         var result =
-            ImmediateWords.FirstOrDefault(e => e.Value.Item1 == op);
+            ImmediatePrimitives.FirstOrDefault(e => e.Value.Item1 == op);
         if(result.Value.Item1 != default)
             return result.Value.Item2;
         else
@@ -348,19 +502,6 @@ public class Vm {
         var bs = new Span<byte>(ds, s + 1, ds[s]);
         foreach(ref byte b in bs)
             b = (byte) char.ToLowerInvariant((char)b); 
-    }
-    void PushOp(Op op) {
-        if(Debug) Console.Write($"C:{op} ");
-        ds[herep] = (Code)op;
-        herep++;
-    }
-    Index PushOp(Op op, Cell value)
-    {
-        if(Debug) Console.Write($"C:{op}:{value} ");
-        PushOp(op);
-        Write7BitEncodedCell(ds, herep, value, out var howMany);
-        herep += howMany;
-        return howMany;
     }
     Index PushExecOp(Op op, Cell? value)
     {
@@ -440,10 +581,6 @@ public class Vm {
         }
     }
 
-    static Index LinkToCode(Index link, Index wordLen)
-        // Addr + Link size + len size  + word chars
-        => link + CELL_SIZE + CHAR_SIZE + CHAR_SIZE * wordLen;
-    static Index LinkToLen(Index link) => link + CELL_SIZE;
 
     void Find()
     {
@@ -464,7 +601,7 @@ public class Vm {
             return;
         }
         // Look for immediate words
-        if(ImmediateWords.TryGetValue(sl, out var imm))
+        if(ImmediatePrimitives.TryGetValue(sl, out var imm))
         {
             RetNewImmediateOp(imm.Item1);
             return;
@@ -489,34 +626,6 @@ public class Vm {
         {
             Drop(); Drop(); Push(xt); Push(f);
         }
-    }
-    internal void FindUserDefinedWord()
-    {
-        var caddr = (Index)Pop();
-        var clen  = ds[caddr];
-        var cspan = new Span<AChar>(ds, caddr + 1 * CHAR_SIZE, clen);
-
-        var dp = dictHead;
-        while(true)
-        {
-            if(dp == 0) break;
-
-            var wordNameStart = dp + CELL_SIZE;
-            var wordLenRaw    = ds[wordNameStart];
-            var wordLen       = Utils.ResetHighBit(wordLenRaw);
-            var wordSpan      = new Span<AChar>(ds, wordNameStart + 1 * CHAR_SIZE, wordLen);
-            var res           = cspan.SequenceEqual(wordSpan);
-            if(res) // Found
-            {
-                Push(LinkToCode(dp, wordLen));                
-                Push(Utils.HighBitValue(wordLenRaw) == 1 ? 1 : -1);
-                return;
-            }
-            dp = (Index)ReadCell(ds, dp);
-        }
-        // Not found
-        Push(caddr);
-        Push(0);
     }
     Index Lastxt() => LinkToCode(dictHead, ds[dictHead + CELL_SIZE]);
 
@@ -544,7 +653,7 @@ public class Vm {
     void Postpone()
     {
         Bl();
-        WordW();
+        Word();
         LowerCase();
         Dup();
         var sl = ToDotNetStringC();
@@ -566,104 +675,14 @@ public class Vm {
             return;
         }
 
-        if(ImmediateWords.TryGetValue(sl, out var imm)) {
+        if(ImmediatePrimitives.TryGetValue(sl, out var imm)) {
             PushOp(imm.Item1);
             return;
         }
         Throw($"{sl: don't know this word.}");
     }
-    bool InterpretWord()
-    {
-        LowerCase();
+    internal bool IsEmptyWord() => ds[Peek()] == 0;
 
-        // TODO: optimize away string creation, requires not storing word to opcode/definition data in hashtables (I think).
-        Dup();
-        var sl = ToDotNetStringC().ToLowerInvariant();
-
-        FindUserDefinedWord();
-        var res   = Pop();
-        var xt    = (Index)Pop();
-
-        // Manage user defined word.
-        if(res != FORTH_FALSE)
-        {
-            var immediate = res == 1;
-            if(Executing || immediate)
-                Execute(Op.Call, xt);
-            else
-                PushOp(Op.Call, xt);
-            return true;
-        }
-        // Manage simple primitives.
-        if(WordToSimpleOp.TryGetValue(sl, out var op))
-        {
-            if(Executing)
-                Execute(op, null);
-            else
-                PushOp(op);
-            return true;
-        }
-        // Manage complex primitives.
-        if(ImmediateWords.TryGetValue(sl, out var imm))
-        {
-            imm.Item2();
-            return true;
-        }
-        return false;
-    }
-    void InterpretNumber(Cell value)
-    {
-        if(Executing)
-            Execute(Op.Numb, value);
-        else
-            PushOp(Op.Numb, value);
-    }
-    internal bool IsEmptyWordC() => ds[Peek()] == 0;
-
-    bool TryParseNumber(string s, out Cell n)
-    {
-        var res = false;
-        var b = ds[base_p];
-        // TODO: is there a way to speed this up without recoding the whole thing?
-        // Recoding might not be bad as we could support bases other than
-        // 
-        try {
-#if CELL32
-            n = Convert.ToInt32(s, b);
-#else
-            n = Convert.ToInt64(s, b);
-#endif
-            res = true;
-        } catch (FormatException )
-        {
-            // This is not acturally an exception case in Forth.
-            n = 0;    
-
-        } catch(OverflowException)
-        {
-            throw;
-        }
-        return res;
-    }
-    void Interpret()
-    {
-        while(true)
-        {
-            Bl();
-            WordW(inKeyword: true);
-            if(IsEmptyWordC()) { Drop(); break;};
-
-            // TODO: remove string allocation from main loop.
-            Dup();
-            var s = ToDotNetStringC();
-            if(!InterpretWord()) {
-                if(TryParseNumber(s, out Cell n))
-                    InterpretNumber(n);
-                else
-                    Throw($"{s} is not a recognized word or number.");
-            }
-        }
-    }
     public string DotS()
     {
         StringBuilder sb = new("Stack: ");
@@ -685,7 +704,6 @@ public class Vm {
 
         do {
             var currentOp = (Op)ds[ip];
-            if(Debug) Console.Write($"E: {currentOp} ");
             ip++;
             Cell n, flag, index, limit, incr ;
             Index count, idx;
@@ -695,7 +713,7 @@ public class Vm {
                     Source();
                     break;
                 case Op.Base:
-                    Push(base_p);
+                    Push(basep);
                     break;
                 case Op.Emit:
                     Console.Write((char)Pop());
@@ -783,7 +801,7 @@ public class Vm {
                     break;
                 case Op.Prin:
                     n = Pop();
-                    Console.Write($"{Convert.ToString(n, ds[base_p])} ");
+                    Console.Write($"{Convert.ToString(n, ds[basep])} ");
                     break;
                 case Op.Count:
                     Count();
@@ -792,7 +810,7 @@ public class Vm {
                     Refill();
                     break;
                 case Op.Word:
-                    WordW();
+                    Word();
                     break;
                 case Op.Parse:
                     Parse();
@@ -928,7 +946,7 @@ public class Vm {
                     break;
                 case Op.Create:
                     Push(' ');
-                    WordW();
+                    Word();
                     if(ds[Peek()] == 0) Throw("Make needs a subsequent word in the stream.");
                     LowerCase();
                     DictAdd();
@@ -955,7 +973,7 @@ public class Vm {
                     break;
                 case Op.Colo:
                     Push(' ');
-                    WordW();
+                    Word();
                     if(ds[Peek()] == 0) Throw("Colon needs a subsequent word in the stream.");
                     LowerCase();
                     DictAdd();
@@ -1062,7 +1080,7 @@ public class Vm {
     void Char()
     {
         Bl();
-        WordW();
+        Word();
         var idx = (Index)Pop();
         if(ds[idx] == 0) Throw("'char' need more input.");
         Push(ds[idx + 1]);
@@ -1081,9 +1099,9 @@ public class Vm {
         {
             inputBuffer = inputBuffer.Trim();
             input_len_chars = Encoding.UTF8.GetByteCount(inputBuffer);
-            if (input_len_chars > source_max_chars)
+            if (input_len_chars > inputBufferSize)
                 throw new Exception(
-                $"Cannot parse a line longer than {source_max_chars}. {inputBuffer} is {input_len_chars} chars long.");
+                $"Cannot parse a line longer than {inputBufferSize}. {inputBuffer} is {input_len_chars} chars long.");
             var inputCharSpan = ToChars(source, input_len_chars);
             var bytes = new Span<byte>(Encoding.UTF8.GetBytes(inputBuffer));
             bytes.CopyTo(inputCharSpan);
@@ -1163,8 +1181,8 @@ public class Vm {
     void FromDotNetString(string s)
     {
         var bytes = Encoding.UTF8.GetBytes(s);
-        bytes.CopyTo(ds, strings);
-        Push(strings);
+        bytes.CopyTo(ds, dotnetStrings);
+        Push(dotnetStrings);
         Push(bytes.Length);
     }
     internal string ToDotNetStringC()
@@ -1194,13 +1212,13 @@ public class Vm {
         Push(off - startOff - 1);
     }
     /** TODO: the delimiter in this implemenation (and Forth) as to be one byte char, but UTF8 puts that into question **/
-    internal void WordW(bool inKeyword = false)
+    internal void Word(bool inKeyword = false)
     {
         var delim = (byte)Pop();
         var s = ToChars(source, input_len_chars);
         var toPtr = inKeyword ? keyWord : word;
 
-        var w = ToChars(toPtr, word_max_chars);
+        var w = ToChars(toPtr, wordBufferSize);
 
         var j = 1; // It is a counted string, the first byte contains the length
 
@@ -1217,7 +1235,7 @@ public class Vm {
         }
 
         // Copy chars until end of space allocated, end of buffer or delim.
-        while (j < word_max_chars && index < input_len_chars && s[(Index)index] != delim)
+        while (j < wordBufferSize && index < input_len_chars && s[(Index)index] != delim)
         {
             var c = s[(Index)index];
             index++;
@@ -1225,7 +1243,7 @@ public class Vm {
         }
         // Points past the delimiter. Otherwise it would stay on last " of a string.
         if(index < input_len_chars) index++;
-        if (j >= word_max_chars) throw new Exception($"Word longer than {word_max_chars}: {Encoding.UTF8.GetString(s)}");
+        if (j >= wordBufferSize) throw new Exception($"Word longer than {wordBufferSize}: {Encoding.UTF8.GetString(s)}");
 
         w[0] = (byte)(j - 1);  // len goes into the first char
         Push(toPtr);
@@ -1307,3 +1325,21 @@ static class Utils {
     internal static bool HasStringSize(byte b)
         => b >= (int)Op.FirstStringWord;
 }
+
+public enum Op {
+    Error , Colo,  Does, Plus, Minu, Mult, Divi, Prin, Base, Noop,
+    Count, Word, Parse, Refill, Comma, CComma, Here, At, Store, State, Bl, Dup, Exit, Immediate,
+    Swap, Dup2, Drop, Drop2, Find, Bye, DotS, Interpret, Quit, Create, Body, RDepth, Depth,
+    Less, More, Equal, NotEqual, Do, Loop, LoopP, ToR, FromR, I, J, Leave, Cr,
+    Source, Type, Emit, Char, In, Over, And, Or, Allot, Cells, Exec, Invert, MulDivRem,
+    Save, Load, SaveSys, LoadSys, Included, DType, DCall, DMethod, CAt, Pad,
+    IDebug, ISemi,  IBegin, IDo, ILoop, ILoopP, IAgain, IIf, IElse, IThen,
+    IWhile, IRepeat, IBrakO, IBrakC,   // End of 1 byte
+    Branch0, RelJmp, ImmCall, IPostponeOp,// End of 2 byte size
+    NumbEx, // End of CELL Size 
+    Jmp , Numb, Call, IPostponeCall, ILiteral, IChar,// End of Var number
+    ICStr, ISStr, ISLit, // End of string words
+    FirstHasVarNumb = Jmp, FirstHas2Size = Branch0, FirstHasCellSize = NumbEx,
+    FirstStringWord = ICStr,
+}
+
