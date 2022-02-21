@@ -1274,7 +1274,7 @@ false invert constant true
         }
     }
     // Code duplication from EvaluateSingleLine on purpose for perf reason. TODO: Refactor EvaluateMultipleLines.
-    void EvaluateMultipleLines(string forthCode)
+    public void EvaluateMultipleLines(string forthCode)
     {
         var oldLine = NextLine;
         try {
