@@ -6,9 +6,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="init.fth">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <None Update="prelimtest.fth">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -38,6 +35,6 @@
 		<Description>Forth for .Net (library, CLI and Interpret).</Description>
 		<Copyright>2020 Ⓒ Luca Bolognese </Copyright>
 		<Authors>Luca Bolognese</Authors>
-		<VersionPrefix>2.0.5</VersionPrefix>	
+		<VersionPrefix>2.0.7</VersionPrefix>	
 	</PropertyGroup>
 </Project>
