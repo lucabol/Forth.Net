@@ -141,6 +141,7 @@ the token in an hash table. Apart from style, this is an irritating allocation i
         { "."           , Token.Prin },
         { "count"       , Token.Count },
         { "words"       , Token.Words },
+        { "testsys"     , Token.TestSys },
         { "cells"       , Token.Cells },
         { "allot"       , Token.Allot },
         { "and"         , Token.And },
@@ -666,6 +667,10 @@ We will comment on the most interesting cases.
                     break;
                 case Token.Bye:
                     Environment.Exit(0);
+                    break;
+                case Token.TestSys:
+                    FromDotNetString("prelimtest.fth");
+                    Included();
                     break;
                 case Token.DotS:
                     Console.WriteLine(DotS());
@@ -1425,7 +1430,7 @@ public enum Token {
     Error , Colo,  Does, Plus, Minu, Mult, Divi, Prin, Base, Noop,
     Count, Word, Parse, Refill, Comma, CComma, Here, At, Store, State, Bl, Dup, Exit, Immediate,
     Swap, Dup2, Drop, Drop2, Find, Bye, DotS, Interpret, Quit, Create, Body, RDepth, Depth,
-    Less, Words, More, Equal, NotEqual, Do, Loop, LoopP, ToR, FromR, I, J, Leave, Cr,
+    Less, Words, TestSys, More, Equal, NotEqual, Do, Loop, LoopP, ToR, FromR, I, J, Leave, Cr,
     Source, Type, Emit, Char, In, Over, And, Or, Allot, Cells, Exec, Invert, MulDivRem,
     Save, Load, SaveSys, LoadSys, Included, DType, DCall, DMethod, CAt, Pad,
     IDebug, ISemi,  IBegin, IDo, ILoop, ILoopP, IAgain, IIf, IElse, IThen,
