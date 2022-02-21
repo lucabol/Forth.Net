@@ -53,7 +53,7 @@ public class Vm {
             return true;
         } catch (FormatException )
         {
-            // This is not acturally an exception case in Forth.
+            // This is not actually an exception case in Forth.
             n = 0;    
 
         } catch(OverflowException)
@@ -68,20 +68,20 @@ public class Vm {
     void InterpretNumber(Cell value)
     {
         if(Executing)
-            Execute(Op.Numb, value);
+            Execute(Token.Numb, value);
         else
-            PushOp(Op.Numb, value);
+            PushOp(Token.Numb, value);
     }
 
     /** Executing a token is a bit complicated. Let's look first at compiling it. Compilation in this model means adding a token on top of the data stack.
         In Forth, the data stack is where user defined words live and we are in the middle of defining one. **/
-    void PushOp(Op op) {
+    void PushOp(Token op) {
         ds[herep] = (Code)op;
         herep++;
     }
     /** Sometimes tokens have parameters. If they have a numeric one, we encode it so to minimize the overall size both in memory (for cache sake) and on disk.
         For that we use the [GitVarInt](https://www.nuget.org/packages/GitVarInt/) library. **/
-    void PushOp(Op op, Cell value)
+    void PushOp(Token op, Cell value)
     {
         PushOp(op);
         Write7BitEncodedCell(ds, herep, value, out var howMany);
@@ -96,7 +96,7 @@ public class Vm {
         execute/compile the corresponding token. If it is an immediate primitive, execute the code associated with it.
 
         It is awkward that finding the user defined word relies on parameters on the stack, while the other cases use a .net string representation to find
-        the token in an hashtable. Apart from style, this is an irritating allocation in the main loop that could be optimized away with some work.
+        the token in an hash table. Apart from style, this is an irritating allocation in the main loop that could be optimized away with some work.
      **/
     bool InterpretWord(string aword)
     {
@@ -111,9 +111,9 @@ public class Vm {
         {
             var immediate = found == 1; // There can be user defined immediate functions.
             if(Executing || immediate)
-                Execute(Op.Call, xt);
+                Execute(Token.Call, xt);
             else
-                PushOp(Op.Call, xt);
+                PushOp(Token.Call, xt);
             return true;
         }
         // Manage simple primitives.
@@ -135,82 +135,82 @@ public class Vm {
     }
 
     /** Simple primitives map a word with the token defining it. **/
-    readonly Dictionary<string, Op> WordToSimpleOp = new()
+    readonly Dictionary<string, Token> WordToSimpleOp = new()
     {
-        { "."           , Op.Prin },
-        { "count"       , Op.Count },
-        { "cells"       , Op.Cells },
-        { "allot"       , Op.Allot },
-        { "and"         , Op.And },
-        { "or"          , Op.Or },
-        { "base"        , Op.Base },
-        { "refill"      , Op.Refill },
-        { "interpret"   , Op.Interpret },
-        { "quit"        , Op.Quit },
-        { "word"        , Op.Word },
-        { "parse"       , Op.Parse },
-        { "save"        , Op.Save },
-        { "load"        , Op.Load },
-        { "savesys"     , Op.SaveSys },
-        { "loadsys"     , Op.LoadSys },
-        { "included"    , Op.Included },
-        { ","           , Op.Comma },
-        { "c,"          , Op.CComma },
-        { "here"        , Op.Here },
-        { "@"           , Op.At },
-        { "c@"          , Op.CAt },
-        { "pad"         , Op.Pad },
-        { "!"           , Op.Store },
-        { "state"       , Op.State },
-        { "bl"          , Op.Bl },
-        { ":"           , Op.Colo },
-        { "bye"         , Op.Bye },
-        { ".s"          , Op.DotS },
-        { "+"           , Op.Plus },
-        { "-"           , Op.Minu },
-        { "*"           , Op.Mult },
-        { "/"           , Op.Divi },
-        { "<"           , Op.Less },
-        { ">"           , Op.More },
-        { "="           , Op.Equal },
-        { "<>"          , Op.NotEqual },
-        { "create"      , Op.Create },
-        { "does>"       , Op.Does },
-        { ">body"       , Op.Body },
-        { "rdepth"      , Op.RDepth },
-        { "swap"        , Op.Swap },
-        { "depth"       , Op.Depth },
-        { "over"        , Op.Over },
-        { "dup"         , Op.Dup },
-        { "dup2"        , Op.Dup2 },
-        { "drop"        , Op.Drop },
-        { "drop2"       , Op.Drop2 },
-        { "*/mod"       , Op.MulDivRem },
-        { "invert"      , Op.Invert },
-        { "exit"        , Op.Exit },
-        { "i"           , Op.I },
-        { "j"           , Op.J },
-        { ">r"          , Op.ToR },
-        { "r>"          , Op.FromR },
-        { "leave"       , Op.Leave },
-        { "immediate"   , Op.Immediate },
-        { "source"      , Op.Source },
-        { "type"        , Op.Type },
-        { "emit"        , Op.Emit },
-        { "cr"          , Op.Cr },
-        { "char"        , Op.Char },
-        { ">in"         , Op.In },
-        { "find"        , Op.Find },
-        { "execute"     , Op.Exec },
-        { ".net>type"   , Op.DType },
-        { ".net>method" , Op.DMethod },
-        { ".net>call"   , Op.DCall },
+        { "."           , Token.Prin },
+        { "count"       , Token.Count },
+        { "cells"       , Token.Cells },
+        { "allot"       , Token.Allot },
+        { "and"         , Token.And },
+        { "or"          , Token.Or },
+        { "base"        , Token.Base },
+        { "refill"      , Token.Refill },
+        { "interpret"   , Token.Interpret },
+        { "quit"        , Token.Quit },
+        { "word"        , Token.Word },
+        { "parse"       , Token.Parse },
+        { "save"        , Token.Save },
+        { "load"        , Token.Load },
+        { "savesys"     , Token.SaveSys },
+        { "loadsys"     , Token.LoadSys },
+        { "included"    , Token.Included },
+        { ","           , Token.Comma },
+        { "c,"          , Token.CComma },
+        { "here"        , Token.Here },
+        { "@"           , Token.At },
+        { "c@"          , Token.CAt },
+        { "pad"         , Token.Pad },
+        { "!"           , Token.Store },
+        { "state"       , Token.State },
+        { "bl"          , Token.Bl },
+        { ":"           , Token.Colo },
+        { "bye"         , Token.Bye },
+        { ".s"          , Token.DotS },
+        { "+"           , Token.Plus },
+        { "-"           , Token.Minu },
+        { "*"           , Token.Mult },
+        { "/"           , Token.Divi },
+        { "<"           , Token.Less },
+        { ">"           , Token.More },
+        { "="           , Token.Equal },
+        { "<>"          , Token.NotEqual },
+        { "create"      , Token.Create },
+        { "does>"       , Token.Does },
+        { ">body"       , Token.Body },
+        { "rdepth"      , Token.RDepth },
+        { "swap"        , Token.Swap },
+        { "depth"       , Token.Depth },
+        { "over"        , Token.Over },
+        { "dup"         , Token.Dup },
+        { "dup2"        , Token.Dup2 },
+        { "drop"        , Token.Drop },
+        { "drop2"       , Token.Drop2 },
+        { "*/mod"       , Token.MulDivRem },
+        { "invert"      , Token.Invert },
+        { "exit"        , Token.Exit },
+        { "i"           , Token.I },
+        { "j"           , Token.J },
+        { ">r"          , Token.ToR },
+        { "r>"          , Token.FromR },
+        { "leave"       , Token.Leave },
+        { "immediate"   , Token.Immediate },
+        { "source"      , Token.Source },
+        { "type"        , Token.Type },
+        { "emit"        , Token.Emit },
+        { "cr"          , Token.Cr },
+        { "char"        , Token.Char },
+        { ">in"         , Token.In },
+        { "find"        , Token.Find },
+        { "execute"     , Token.Exec },
+        { ".net>type"   , Token.DType },
+        { ".net>method" , Token.DMethod },
+        { ".net>call"   , Token.DCall },
     };
 
     /** On the other hand, immediate actions need to be executed at compile time when their token is encountered.
         This is indexed by the string word, which is what we see in the interpreter. But later I discovered the need
-        to index it by operator as well, so I goofly bolted it on as a tuple. We'll look in more depth at how they work later. **/
-    readonly Dictionary<string, (Op, Action)> ImmediatePrimitives = new();
+        to index it by operator as well, so I bolted it on as a tuple. We'll look in more depth at how they work later. **/
+    readonly Dictionary<string, (Token, Action)> ImmediatePrimitives = new();
 
     /** User defined words are stored in the data space as a linked list. Each word is in the format:
         -> Cell   <-> One Byte <-> Bytes    <-> Bytes
@@ -249,7 +249,7 @@ public class Vm {
     }
 
     /** These functions abstract out the details of the word structure. At least that was the idea. In practice that knowledge has leaked
-        in other parts of the codebase. **/
+        in other parts of the code base. **/
     static Index LinkToCode(Index link, Index wordLen)
         // Addr + Link size + len size  + word chars
         => link + CELL_SIZE + CHAR_SIZE + CHAR_SIZE * wordLen;
@@ -270,7 +270,7 @@ public class Vm {
     AUnit[] rs;                         // Return stack.
     AUnit[] ds;                         // Data space.
 
-    /** Then come some pointers that delimitate areas in the data space that are used by the system or point to some system cells.
+    /** Then come some pointers that map areas in the data space that are used by the system or point to some system cells.
         They get initialized in the Vm constructor. Also, some other random state used by the system. **/
 
     Index dictHead;                     // The last word added to the dictionary.
@@ -296,159 +296,121 @@ public class Vm {
 
     public bool Debug { get ; set; }    // Doesn't do much as of now, but we can extend it to print out a lot of useful thins (i.e., token disassembly).
 
+    /** I decided for the system to use UTF8 internally to save space, despite .NET running on a 'kind of' UTF16. I convert at the boundary.
+        A cell can be either 64 bits or 32 bits. I have not tested the latter. **/
     internal const Index CHAR_SIZE = 1;
-    internal const Index CELL_SIZE
-                        = sizeof(Cell);
+    internal const Index CELL_SIZE = sizeof(Cell);
 
     const Cell FORTH_TRUE  = -1;
     const Cell FORTH_FALSE = 0;
 
+    /** This is very important. By setting this field you can get the interpret to read the next line of text from wherever (typically Console or file). **/
     public Func<string>? NextLine = null;
 
+    /** These cache the last dotnet type and method, so that you can call multiple methods on the same type ergonomically. **/
     Type lastType = typeof(Console);
     MethodInfo? lastMethod;
 
+    /** Let's see how the pointers are initialized. First some debatable defaults for the most important
+        data source areas. **/
     public Vm(
-        Index parameterStackSize = Config.SmallStack,
-        Index returnStackSize    = Config.SmallStack,
-        Index dataStackSize      = Config.MediumStack,
-        Index stringsSize        = 270,
-        Index padSize            = 1_024,
-        Index sourceSize         = 1_024,
-        Index wordSize           = 1_024
+        Index parameterStackSize =  16 * 1_024,
+        Index returnStackSize    =  16 * 1_024,
+        Index dataStackSize      = 256 * 1_024,
+        Index padSize            =       1_024,
+        Index sourceSize         =       1_024,
+        Index wordSize           =       1_024
         ) {
 
+        /** These are the arrays storing the three most important memory areas. **/
         ps   = new AUnit[parameterStackSize];
         rs   = new AUnit[returnStackSize];
         ds   = new AUnit[dataStackSize];
 
-        code          = herep;
-        herep        += CHAR_SIZE + CELL_SIZE;
+        /** And we initialize all the pointers **/
+        inputBufferSize  = sourceSize;
+        wordBufferSize   = wordSize;
 
-        keyWord       = herep;
-        herep        += wordSize * CHAR_SIZE;
-        source        = herep;
-        herep        += sourceSize * CHAR_SIZE;
+        code             = herep;
+        herep           += CHAR_SIZE + CELL_SIZE; // Maximum size of an instruction.
 
-        word          = herep;
-        herep        += wordSize * CHAR_SIZE;
+        keyWord          = herep;
+        herep           += wordSize * CHAR_SIZE;
+        source           = herep;
+        herep           += sourceSize * CHAR_SIZE;
+
+        word             = herep;
+        herep           += wordSize * CHAR_SIZE;
 
         pad              = herep;
         herep           += padSize;
-        inputBufferSize = sourceSize;
-        wordBufferSize   = wordSize;
 
-        basep     = herep;
-        herep    += CELL_SIZE;
-        ds[basep] = 10;
+        basep            = herep;
+        herep           += CELL_SIZE;
+        ds[basep]        = 10;
 
-        dotnetStrings = herep;
-        herep += stringsSize * Vm.CHAR_SIZE;
+        dotnetStrings    = herep;
+        herep           += 256 * Vm.CHAR_SIZE;
 
-        inp     = herep;
-        herep += CELL_SIZE;
+        inp              = herep;
+        herep           += CELL_SIZE;
 
-        state   = herep;
-        herep += CELL_SIZE;
+        state            = herep;
+        herep           += CELL_SIZE;
 
-        void Mark()          => Push(herep);
-        void BranchAndMark() { PushOp(Op.Branch0); Mark(); herep += 2;}
-        void EmbedInPoppedJmpFwd() {
-                PushOp(Op.RelJmp);
-                var mark = (Index)Pop();
-                short delta = (short)((herep + 2) - mark);
-                WriteInt16(ds, mark, delta);
-                Push(herep);
-                herep += 2;
-        }
-        void EmbedHereJmpBck() {
-                PushOp(Op.RelJmp);
-                var mark = (Index)Pop();
-                var delta = (short)(mark - herep);
-                WriteInt16(ds, herep, delta); 
-                herep += 2;
-        }
-        void EmbedHereJmp0Bck() {
-                PushOp(Op.Loop);
-                var mark = (Index)Pop();
-                var delta = (short)(mark - herep);
-                WriteInt16(ds, herep, delta); 
-                herep += 2;
+        userStart        = herep;
+        savedDictHead    = herep;
+        herep           += CELL_SIZE;
 
-                var leaveTarget = mark - CELL_SIZE;
-                WriteCell(ds, leaveTarget, herep);
-        }
-        void EmbedHereJmp0BckP() {
-                PushOp(Op.LoopP);
-                var mark = (Index)Pop();
-                var delta = (short)(mark - herep);
-                WriteInt16(ds, herep, delta); 
-                herep += 2;
-        }
-        Action EmbedString(Op op) { return () =>
-            {
-                PushOp(op);
-
-                Push('"');
-                Parse();
-                var len = (Index)Peek();
-                Push(herep + 1);
-                Swap();
-                CMove();
-                if(Executing && op == Op.ICStr) Push(herep);
-                if(Executing && op == Op.ISStr) { Push(herep + 1); Push(len); }
-                ds[herep] = (byte)len;
-                herep += len + 1;
-            };
-        }
-        Action SEmbedString(Op op) { return () =>
-        {
-            PushOp(op);
-            var len = (Index)Pop();
-            Push(herep + 1);
-            Push(len);
-            CMove();
-            ds[herep] = (byte)len;
-            herep += len + 1;
-        };}
-
+        /** This table contains the immediate primitive words. These words are executed at compile time.
+            The management of conditionals and loop constructs is messy.
+        
+            Take the `if` statement, at the point where the interpret encounters it, it doesn't yet know
+            where it has to jump to in case the condition is not satisfied.
+            It embeds a 'conditional' branching instruction, leaving two bytes
+            empty for the branching target. It also pushes the address of the empty bytes.
+            When the interpret encounters `else` or `then`, it backfill those empty bytes with
+            the right value so that the branch instruction jumps to the correct point.
+        
+            Other flow control structures behave similarly. **/
         ImmediatePrimitives = new()
         {
-            { "debug",      (Op.IDebug,     () => Debug = !Debug) },
-            { "[char]",     (Op.IChar,      () => { Char(); PushOp(Op.Numb, Pop());}) },
-            { "literal",    (Op.ILiteral,       () => { PushOp(Op.Numb, Pop());}) },
-            { "sliteral",   (Op.ISLit,      SEmbedString(Op.ISLit)) },
-            { "[",          (Op.IBrakO,     () => Executing = true) },
-            { "]",          (Op.IBrakC,     () => Executing = false) },
-            { ";",          (Op.ISemi,      () => { PushOp(Op.Exit);  Executing = true; }) },
-            { "postpone",   (Op.IPostponeCall,  Postpone) },
-            { "begin",      (Op.IBegin,     Mark) },
-            { "do",         (Op.IDo,        () => { PushOp(Op.Do); herep += CELL_SIZE; Mark(); }) },
-            { "loop",       (Op.ILoop,      EmbedHereJmp0Bck)},
-            { "+loop",      (Op.ILoopP,     EmbedHereJmp0BckP)},
-            { "again",      (Op.IAgain,     EmbedHereJmpBck)},    
-            { "if",         (Op.IIf,        BranchAndMark) },
-            { "else",       (Op.IElse,      EmbedInPoppedJmpFwd)  },    
-            { "then",       (Op.IThen,      () => {
+            { "debug",      (Token.IDebug,     () => Debug = !Debug) },
+            { "[char]",     (Token.IChar,      () => { Char(); PushOp(Token.Numb, Pop());}) },
+            { "literal",    (Token.ILiteral,   () => { PushOp(Token.Numb, Pop());}) },
+            { "sliteral",   (Token.ISLit,      EmbedSString(Token.ISLit)) },
+            { "[",          (Token.IBrakO,     () => Executing = true) },
+            { "]",          (Token.IBrakC,     () => Executing = false) },
+            { ";",          (Token.ISemi,      () => { PushOp(Token.Exit);  Executing = true; }) },
+            { "postpone",   (Token.IPostCall,  Postpone) },
+            { "begin",      (Token.IBegin,     () => Push(herep)) },
+            { "do",         (Token.IDo,        () => { PushOp(Token.Do); herep += CELL_SIZE; Push(herep); }) },
+            { "loop",       (Token.ILoop,      EmbedHereJmp0Bck)},
+            { "+loop",      (Token.ILoopP,     EmbedHereJmp0BckP)},
+            { "again",      (Token.IAgain,     EmbedHereJmpBck)},    
+            { "if",         (Token.IIf,        BranchAndMark) },
+            { "else",       (Token.IElse,      EmbedInPoppedJmpFwd)  },    
+            { "then",       (Token.IThen,      () => {
                 var mark = (Index)Pop();
                 short delta = (short)(herep - mark);
                 WriteInt16(ds, mark, delta);
             }) },
-            { "while",      (Op.IWhile,     BranchAndMark) },    
-            { "repeat",     (Op.IRepeat,    () => {
+            { "while",      (Token.IWhile,     BranchAndMark) },    
+            { "repeat",     (Token.IRepeat,    () => {
                 var whileMark = (Index)Pop();
                 short delta   = (short)(herep + 3 - whileMark);
                 WriteInt16(ds, whileMark, delta);
                 EmbedHereJmpBck();
                 }) },
-            { "c\"",         (Op.ICStr, EmbedString(Op.ICStr)) },
-            { "s\"",         (Op.ISStr, EmbedString(Op.ISStr)) },
+            { "c\"",         (Token.ICStr,     EmbedString(Token.ICStr)) },
+            { "s\"",         (Token.ISStr,     EmbedString(Token.ISStr)) },
         };
 
-        userStart = herep;
-        savedDictHead = herep;
-        herep        += CELL_SIZE;
-
+        /** After everything is set up, we can now load the initialization files. In Forth, normally 
+            a good part of the interpret is written in Forth itself. Implementations vary with regard to
+            how many instructions are primitives. The obvious trade-offs apply.
+        
+            Here we try to load from a binary file first, if present. **/
         if(File.Exists("init.io"))
         {
             FromDotNetString("init.io");
@@ -460,9 +422,495 @@ public class Vm {
         {
             Console.WriteLine("No init file loaded.");
         }
-        Reset();
 
+        Reset();
     }
+    /** In our token based interpret, loading and saving the system is a trivial operation. Just copy the bytes. **/
+    void SaveSystem(bool all = false)
+    {
+        var start = all ? 0 : userStart ;
+        WriteCell(ds, savedDictHead, dictHead);
+
+        var fileName = ToDotNetString();
+        File.WriteAllBytes(fileName, ds[start .. herep]);
+        Console.WriteLine($"Saved in file {Path.Join(Environment.CurrentDirectory, fileName)} .");
+    }
+    void LoadSystem(bool all = false)
+    {
+        var start = all ? 0 : userStart ;
+        var fileName = ToDotNetString();
+        var buf      = File.ReadAllBytes(fileName);
+        buf.CopyTo(ds, start);
+
+        dictHead = (Index)ReadCell(ds, savedDictHead);
+        herep = buf.Length;
+        Console.WriteLine($"Loaded from file {Path.Join(Environment.CurrentDirectory, fileName)}");
+    }
+
+    /** With all of that under our belt, we can now look at `Execute`. This is `switch threaded`.
+        It could be written as a table of `Token` to `Action`, but then I would lose possible
+        performance tricks that the compiler can play to speed it up (i.e., using function pointers).
+
+        It is a giant `do ... while` loop of getting the Token at the instruction pointer and performing
+        the associated action. The action might change the instruction pointer (i.e., jumps), so when
+        we get back to the top of the loop, we might be executing at a very different `ip` from where started.
+
+        We will comment on the most interesting cases.
+    **/
+
+    void Execute(Token op, Cell? data) {
+
+        Index opLen = PushExecOp(op, data); // Store the token and data in the code area so IP can point to it.
+        var ip      = code;
+
+        do {
+            var token = (Token)ds[ip];
+            ip++;
+
+            Cell n, flag, index, limit, incr ;
+            Index count, idx;
+            bool bflag;
+
+            switch(token) {
+                case Token.Source:
+                    Source();
+                    break;
+                case Token.Base:
+                    Push(basep);
+                    break;
+                case Token.Emit:
+                    Console.Write((char)Pop());
+                    break;
+                case Token.Type:
+                    Console.Write(ToDotNetString());
+                    break;
+                /** A string literal gets stored immediately after the ip. **/
+                case Token.ISLit:
+                    count = ds[ip];
+                    Push(ip + 1);
+                    Push(count);
+                    ip += count + 1;
+                    break;
+                /** Postponing is a two step process. At compile time, we embed one of the two tokens below.
+                    They allow postponing either user defined functions or primitives. For immediate primitives, 
+                    postponing means embedding a token to execute the action. See description of `Postpone()` later.**/
+                case Token.IPostCall:
+                    n = Read7BitEncodedCell(ds, ip, out count);
+                    PushOp(Token.Call, n);
+                    ip += count;
+                    break;
+                case Token.IPostponeOp:
+                    PushOp((Token)ds[ip]);
+                    ip += 2; // There is a noop here to classify this as 2 bytes operation.
+                    break;
+                case Token.ImmCall:
+                    var act = ImmediateAction((Token)ds[ip]);
+                    if(act is null) Throw($"ImmCall with a non existing op: {(Token)ds[ip]}");
+                    act();
+                    ip++;
+                    break;
+                case Token.Allot:
+                    herep += (Index)Pop();
+                    break;
+                /** These three tokens enable my rudimentary (static methods) dotnet integration. **/
+                case Token.DType:
+                    var typeName = ToDotNetString();
+                    var aType = Type.GetType(typeName);
+                    if(aType is null) Throw($"Cannot find type {typeName}");
+                    lastType = aType;
+                    break;
+                case Token.DMethod:
+                    var methodName = ToDotNetString();
+                    lastMethod = lastType.GetMethod(methodName);
+                    if(lastMethod is null) Throw($"No method {methodName} on type {lastType.Name}");
+                    break;
+                case Token.DCall:
+                    DCall();
+                    break;
+                case Token.Cells:
+                    Push(Pop() * CELL_SIZE);
+                    break;
+                case Token.Find:
+                    Find();
+                    break;
+                case Token.Exec:
+                    idx = (Index)Pop();
+                    RPush(ip);
+                    ip = (Index)idx;
+                    break;
+                case Token.Cr:
+                    Console.WriteLine();
+                    break;
+                case Token.In:
+                    Push(inp);
+                    break;
+                case Token.Char:
+                    Char();
+                    break;
+                case Token.ICStr:
+                    Push(ip);
+                    ip += ds[ip] + 1;
+                    break;
+                case Token.ISStr:
+                    Push(ip + 1);
+                    idx = ds[ip];
+                    Push(idx);
+                    ip += idx + 1;
+                    break;
+                /** Numb and NumbEx are two ways to embed a number in the ip stream. The latter is needed 
+                    because of the control structures (i.e., loop, if, ...). We need to use a full cell to store
+                    the jumping point as we don't know upfront where we are going to jump to, hence how many bytes
+                    we are going to need to store the address. **/
+                case Token.Numb:
+                    n = Read7BitEncodedCell(ds, ip, out count);
+                    Push(n);
+                    ip += count;
+                    break;
+                case Token.NumbEx:
+                    n = ReadCell(ds, ip);
+                    Push(n);
+                    ip = (Index)RPop();
+                    break;
+                case Token.Prin:
+                    n = Pop();
+                    Console.Write($"{Convert.ToString(n, ds[basep])} ");
+                    break;
+                case Token.Count:
+                    Count();
+                    break;
+                case Token.Refill:
+                    Refill();
+                    break;
+                case Token.Word:
+                    Word();
+                    break;
+                case Token.Parse:
+                    Parse();
+                    break;
+                case Token.Comma:
+                    Comma();
+                    break;
+                case Token.CComma:
+                    ds[herep] = (byte) Pop();
+                    herep++;
+                    break;
+                case Token.Save:
+                    SaveSystem();
+                    break;
+                case Token.Load:
+                    LoadSystem();
+                    break;
+                case Token.SaveSys:
+                    SaveSystem(true);
+                    break;
+                case Token.LoadSys:
+                    LoadSystem(true);
+                    break;
+                case Token.Included:
+                    Included();
+                    break;
+                case Token.Here:
+                    Here();
+                    break;
+                case Token.ToR:
+                    PStoRS();
+                    break;
+                case Token.FromR:
+                    FromR();
+                    break;
+                case Token.At:
+                    At();
+                    break;
+                case Token.CAt:
+                    CFetch();
+                    break;
+                case Token.Pad:
+                    Push(pad);
+                    break;
+                case Token.Drop:
+                    Drop();
+                    break;
+                case Token.Drop2:
+                    Drop2();
+                    break;
+                case Token.MulDivRem:
+                    MulDivRem();
+                    break;
+                case Token.Store:
+                    Store();
+                    break;
+                case Token.State:
+                    State();
+                    break;
+                case Token.Bl:
+                    Bl();
+                    break;
+                case Token.Dup:
+                    Dup();
+                    break;
+                case Token.Swap:
+                    Swap();
+                    break;
+                case Token.Over:
+                    Over();
+                    break;
+                case Token.Dup2:
+                    Dup2();
+                    break;
+                case Token.Bye:
+                    Environment.Exit(0);
+                    break;
+                case Token.DotS:
+                    Console.WriteLine(DotS());
+                    break;
+                case Token.Quit:
+                    Quit();
+                    break;
+                case Token.Interpret:
+                    Interpret();
+                    break;
+                case Token.And:
+                    Push(Pop() & Pop());
+                    break;
+                case Token.Or:
+                    Push(Pop() | Pop());
+                    break;
+                case Token.Plus:
+                    Push(Pop() + Pop());
+                    break;
+                case Token.Minu:
+                    Push(- Pop() + Pop());
+                    break;
+                case Token.Mult:
+                    Push(Pop() * Pop());
+                    break;
+                case Token.Less:
+                    Push(Pop() > Pop() ? FORTH_TRUE : FORTH_FALSE);
+                    break;
+                case Token.More:
+                    Push(Pop() < Pop() ? FORTH_TRUE : FORTH_FALSE);
+                    break;
+                case Token.Equal:
+                    Push(Pop() == Pop() ? FORTH_TRUE : FORTH_FALSE);
+                    break;
+                case Token.NotEqual:
+                    Push(Pop() != Pop() ? FORTH_TRUE : FORTH_FALSE);
+                    break;
+                case Token.Depth:
+                    Push(sp / CELL_SIZE);
+                    break;
+                case Token.RDepth:
+                    Push(rp / CELL_SIZE);
+                    break;
+                case Token.Invert:
+                    Push(~Pop());
+                    break;
+                case Token.Immediate:
+                    Utils.SetHighBit(ref ds[LinkToLen(dictHead)]);
+                    break;
+                case Token.Divi:
+                    var d = Pop();
+                    var u = Pop();
+                    Push(u / d);
+                    break;
+                case Token.Body:
+                    Push(Pop() + 1 + CELL_SIZE); // See create below.
+                    break;
+                /** `create ... does>` is the pearl of Forth, but its implementation is complex. `create`
+                    gives a byte address in the data space a name adding it to the dictionary. It also embed
+                    a token in the instruction stream to push the created address when executed, so that
+                    this works `create bob 10 , bob ?`. Here is a place when we need to use `NumbEx`. **/
+                case Token.Create:
+                    Push(' ');
+                    Word();
+                    if(ds[Peek()] == 0) Throw("'create' needs a subsequent word in the stream.");
+                    LowerCase();
+                    DictAdd();
+
+                    PushOp(Token.NumbEx);
+                    // Need to use full cell because it gets substituted by a jmp in does>
+                    // and I don't know how many cells the number I need to jump to takes
+                    WriteCell(ds, herep, herep + CELL_SIZE);
+                    herep += CELL_SIZE;
+                    break;
+                /** Here stuff is tricky. First we get the address for the code of the last `created` word
+                    (where `create` stored the `NumbEx addr`). We then override it with a jump to the current
+                    `ip`. Then we store an instruction to push the address of the last created word. Finally,
+                    we copy all the remaining tokens until we encounter Exit. This allows the following to
+                    work and print `10`: `: var create  , does> ? ;   10 var bob  bob`**/
+                case Token.Does:
+                    // Allows adding code to the last `defined` word, not just last `created` one!!
+                    // Even in gforth!!
+                    idx = Lastxt();
+                    var addrToPush = ReadCell(ds, idx + 1);
+                    
+                    var currentIp = herep;
+                    herep = idx;
+                    PushOp(Token.Jmp, currentIp);
+                    herep = currentIp;
+                    PushOp(Token.Numb, addrToPush);
+                    PushUntilExit(ref ip);
+                    ip = (Index)RPop();
+                    break;
+                /** Colon `:`, despite its importance, is utterly simple. Get the next word from the input
+                    buffer, add it to the dictionary and move the interpret to compile mode. **/
+                case Token.Colo:
+                    Push(' ');
+                    Word();
+                    if(ds[Peek()] == 0) Throw("Colon needs a subsequent word in the stream.");
+                    LowerCase();
+                    DictAdd();
+                    Executing = false;
+                    break;
+                /** A `call` stores the ip on the return stack, while `jmp` just moves the ip. **/
+                case Token.Call:
+                    n = Read7BitEncodedCell(ds, ip, out count);
+                    ip += count;
+                    RPush(ip);
+                    ip = (Index)n;
+                    break;
+                case Token.Jmp:
+                    n = Read7BitEncodedCell(ds, ip, out _);
+                    ip = (Index) n;
+                    break;
+                /** `exit` gets the ip from the return stack **/
+                case Token.Exit:
+                    ip = (Index)RPop();
+                    break;
+                /** Here come all the instructions for control flow control in a stack based Vm.
+                    I recommend stepping through a `do ... loop` to understand the tricky details.
+                    Generally, the return stack contains `ip after the loop | limit | index`.
+                    'ip after the loop` is needed by the `leave` instruction, which needs to know where
+                    to go. There might be a way to pre-calculate this at compile time, but I didn't find it.
+                **/
+                case Token.Branch0:
+                    flag = Pop();
+                    ip += flag == FORTH_FALSE ? ReadInt16(ds, ip) : 2 ;
+                    break;
+                case Token.Do:
+                    RPush(ReadCell(ds, ip));
+                    ip += CELL_SIZE;
+                    PStoRS();
+                    PStoRS();
+                    break;
+                case Token.I:
+                    Push(ReadCell(rs, rp - CELL_SIZE * 2));
+                    break;
+                case Token.J:
+                    Push(ReadCell(rs, rp - CELL_SIZE * 5));
+                    break;
+                case Token.Leave:
+                    RPop();
+                    RPop();
+                    ip = (Index)RPop();
+                    break;
+                case Token.Loop:
+                    limit = RPop();
+                    index = RPop();
+                    index++;
+                    bflag = index < limit; 
+                    if(bflag) {
+                        RPush(index);
+                        RPush(limit);
+                        ip += ReadInt16(ds, ip);
+                    }  else {
+                        RPop();
+                        ip += 2;
+                    }
+                    break;
+                case Token.LoopP:
+                    incr  = Pop();
+                    limit = RPop();
+                    index = RPop();
+                    index += incr;
+                    bflag = incr > 0 ? index < limit : index >= limit; 
+                    if(bflag) {
+                        RPush(index);
+                        RPush(limit);
+                        ip += ReadInt16(ds, ip);
+                    }  else {
+                        RPop();
+                        ip += 2;
+                    }
+                    break;
+                /** For control structures we use relative jumps of 2 bytes, not to waste a full cell for them.
+                    If you have an `if` statement longer than `FFFFFFFF` bytes, you are screwed. **/
+                case Token.RelJmp:
+                    ip += ReadInt16(ds, ip);
+                    break;
+                default:
+                    /** We can treat all the immediate primitives in a generic way, by just calling their
+                        associated action. **/
+                    var a = ImmediateAction(token); 
+                    if(a is not null)
+                        a();
+                    else 
+                        Throw($"{(Token)op} bytecode not supported.");
+                    break;
+            }
+        /** When do we stop looping? It took me a while to get this one right. The `ip` wonders around the
+            data space following all the `call` and `jmp`,but, eventually, it comes back where it started. **/
+        } while (ip != code + opLen);
+    }
+    void BranchAndMark() { PushOp(Token.Branch0); Push(herep); herep += 2;}
+    void EmbedInPoppedJmpFwd() {
+            PushOp(Token.RelJmp);
+            var mark = (Index)Pop();
+            short delta = (short)((herep + 2) - mark);
+            WriteInt16(ds, mark, delta);
+            Push(herep);
+            herep += 2;
+    }
+    void EmbedHereJmpBck() {
+            PushOp(Token.RelJmp);
+            var mark = (Index)Pop();
+            var delta = (short)(mark - herep);
+            WriteInt16(ds, herep, delta); 
+            herep += 2;
+    }
+    void EmbedHereJmp0Bck() {
+            PushOp(Token.Loop);
+            var mark = (Index)Pop();
+            var delta = (short)(mark - herep);
+            WriteInt16(ds, herep, delta); 
+            herep += 2;
+
+            var leaveTarget = mark - CELL_SIZE;
+            WriteCell(ds, leaveTarget, herep);
+    }
+    void EmbedHereJmp0BckP() {
+            PushOp(Token.LoopP);
+            var mark = (Index)Pop();
+            var delta = (short)(mark - herep);
+            WriteInt16(ds, herep, delta); 
+            herep += 2;
+    }
+    Action EmbedString(Token op) { return () =>
+    {
+        PushOp(op);
+
+        Push('"');
+        Parse();
+        var len = (Index)Peek();
+        Push(herep + 1);
+        Swap();
+        CMove();
+        if(Executing && op == Token.ICStr) Push(herep);
+        if(Executing && op == Token.ISStr) { Push(herep + 1); Push(len); }
+        ds[herep] = (byte)len;
+        herep += len + 1;
+    }; }
+
+    Action EmbedSString(Token op) { return () =>
+    {
+        PushOp(op);
+        var len = (Index)Pop();
+        Push(herep + 1);
+        Push(len);
+        CMove();
+        ds[herep] = (byte)len;
+        herep += len + 1;
+    };}
     public void Reset()
     {
         sp = 0; rp = 0; Executing = true; ds[inp] = 0;
@@ -487,7 +935,7 @@ public class Vm {
     }
 
     // TODO: clean this up, it now works because the default value of Op is 0 -> Error. It should use some kind of multidictionary here.
-    Action? ImmediateAction(Op op) {
+    Action? ImmediateAction(Token op) {
         var result =
             ImmediatePrimitives.FirstOrDefault(e => e.Value.Item1 == op);
         if(result.Value.Item1 != default)
@@ -503,7 +951,7 @@ public class Vm {
         foreach(ref byte b in bs)
             b = (byte) char.ToLowerInvariant((char)b); 
     }
-    Index PushExecOp(Op op, Cell? value)
+    Index PushExecOp(Token op, Cell? value)
     {
         ds[code] = (Code)op;
         var howMany = 0;
@@ -542,24 +990,6 @@ public class Vm {
             NextLine = backNext;
         }
     }
-    void SaveSystem(bool all = false)
-    {
-        var start = all ? 0 : userStart ;
-        WriteCell(ds, savedDictHead, dictHead);
-        var fileName = ToDotNetString();
-        File.WriteAllBytes(fileName, ds[start .. herep]);
-        Console.WriteLine($"Saved in file {Path.Join(Environment.CurrentDirectory, fileName)} .");
-    }
-    void LoadSystem(bool all = false)
-    {
-        var start = all ? 0 : userStart ;
-        var fileName = ToDotNetString();
-        var buf      = File.ReadAllBytes(fileName);
-        buf.CopyTo(ds, start);
-        dictHead = (Index)ReadCell(ds, savedDictHead);
-        herep = buf.Length;
-        Console.WriteLine($"Loaded from file {Path.Join(Environment.CurrentDirectory, fileName)}");
-    }
     void PushUntilExit(ref Index ip)
     {
         while(true)
@@ -576,7 +1006,7 @@ public class Vm {
             Array.Copy(ds, ip, ds, herep, 1 + count);
             ip += 1 + count;
             herep += 1 + count;
-            if((Op)op == Op.Exit)
+            if((Token)op == Token.Exit)
                 break;
         }
     }
@@ -607,19 +1037,19 @@ public class Vm {
             return;
         }
         // Getting here, we return the result of FindUserDefinedWord. Below utility funcs.
-        void RetNewImmediateOp(Op op)
+        void RetNewImmediateOp(Token op)
         {
             var xt = herep;
-            PushOp(Op.ImmCall);
+            PushOp(Token.ImmCall);
             PushOp(op);
-            PushOp(Op.Exit);
+            PushOp(Token.Exit);
             Ret(xt, 1);
         }
-        void RetNewOp(Op op)
+        void RetNewOp(Token op)
         {
             var xt = herep;
             PushOp(op);
-            PushOp(Op.Exit);
+            PushOp(Token.Exit);
             Ret(xt, -1);
         }
         void Ret(Index xt, Cell f)
@@ -664,14 +1094,14 @@ public class Vm {
         var xt    = (Index)Pop();
 
         if(res != FORTH_FALSE) {
-            PushOp(Op.IPostponeCall, xt);
+            PushOp(Token.IPostCall, xt);
             return;
         }
 
         if(WordToSimpleOp.TryGetValue(sl, out var op)) {
-            PushOp(Op.IPostponeOp);
+            PushOp(Token.IPostponeOp);
             PushOp(op);
-            PushOp(Op.Noop);
+            PushOp(Token.Noop);
             return;
         }
 
@@ -697,366 +1127,6 @@ public class Vm {
     internal void Bl()    => Push(' ');
     void State() => Push(state);
 
-    void Execute(Op op, Cell? data) {
-
-        Index opLen = PushExecOp(op, data);
-        var ip      = code;
-
-        do {
-            var currentOp = (Op)ds[ip];
-            ip++;
-            Cell n, flag, index, limit, incr ;
-            Index count, idx;
-            bool bflag;
-            switch(currentOp) {
-                case Op.Source:
-                    Source();
-                    break;
-                case Op.Base:
-                    Push(basep);
-                    break;
-                case Op.Emit:
-                    Console.Write((char)Pop());
-                    break;
-                case Op.Type:
-                    Console.Write(ToDotNetString());
-                    break;
-                case Op.ISLit:
-                    count = ds[ip];
-                    Push(ip + 1);
-                    Push(count);
-                    ip += count + 1;
-                    break;
-                case Op.IPostponeCall:
-                    n = Read7BitEncodedCell(ds, ip, out count);
-                    PushOp(Op.Call, n);
-                    ip += count;
-                    break;
-                case Op.IPostponeOp:
-                    PushOp((Op)ds[ip]);
-                    ip += 2; // There is a noop here to classify this as 2 bytes operation.
-                    break;
-                case Op.ImmCall:
-                    var act = ImmediateAction((Op)ds[ip]);
-                    if(act is null) Throw($"ImmCall with a non existing op: {(Op)ds[ip]}");
-                    act();
-                    ip++;
-                    break;
-                case Op.Allot:
-                    herep += (Index)Pop();
-                    break;
-                case Op.DType:
-                    var typeName = ToDotNetString();
-                    var aType = Type.GetType(typeName);
-                    if(aType is null) Throw($"Cannot find type {typeName}");
-                    lastType = aType;
-                    break;
-                case Op.DMethod:
-                    var methodName = ToDotNetString();
-                    lastMethod = lastType.GetMethod(methodName);
-                    if(lastMethod is null) Throw($"No method {methodName} on type {lastType.Name}");
-                    break;
-                case Op.DCall:
-                    DCall();
-                    break;
-                case Op.Cells:
-                    Push(Pop() * CELL_SIZE);
-                    break;
-                case Op.Find:
-                    Find();
-                    break;
-                case Op.Exec:
-                    idx = (Index)Pop();
-                    RPush(ip);
-                    ip = (Index)idx;
-                    break;
-                case Op.Cr:
-                    Console.WriteLine();
-                    break;
-                case Op.In:
-                    Push(inp);
-                    break;
-                case Op.Char:
-                    Char();
-                    break;
-                case Op.ICStr:
-                    Push(ip);
-                    ip += ds[ip] + 1;
-                    break;
-                case Op.ISStr:
-                    Push(ip + 1);
-                    idx = ds[ip];
-                    Push(idx);
-                    ip += idx + 1;
-                    break;
-                case Op.Numb:
-                    n = Read7BitEncodedCell(ds, ip, out count);
-                    Push(n);
-                    ip += count;
-                    break;
-                case Op.NumbEx:
-                    n = ReadCell(ds, ip);
-                    Push(n);
-                    ip = (Index)RPop();
-                    break;
-                case Op.Prin:
-                    n = Pop();
-                    Console.Write($"{Convert.ToString(n, ds[basep])} ");
-                    break;
-                case Op.Count:
-                    Count();
-                    break;
-                case Op.Refill:
-                    Refill();
-                    break;
-                case Op.Word:
-                    Word();
-                    break;
-                case Op.Parse:
-                    Parse();
-                    break;
-                case Op.Comma:
-                    Comma();
-                    break;
-                case Op.CComma:
-                    ds[herep] = (byte) Pop();
-                    herep++;
-                    break;
-                case Op.Save:
-                    SaveSystem();
-                    break;
-                case Op.Load:
-                    LoadSystem();
-                    break;
-                case Op.SaveSys:
-                    SaveSystem(true);
-                    break;
-                case Op.LoadSys:
-                    LoadSystem(true);
-                    break;
-                case Op.Included:
-                    Included();
-                    break;
-                case Op.Here:
-                    Here();
-                    break;
-                case Op.ToR:
-                    ToR();
-                    break;
-                case Op.FromR:
-                    FromR();
-                    break;
-                case Op.At:
-                    At();
-                    break;
-                case Op.CAt:
-                    CFetch();
-                    break;
-                case Op.Pad:
-                    Push(pad);
-                    break;
-                case Op.Drop:
-                    Drop();
-                    break;
-                case Op.Drop2:
-                    Drop2();
-                    break;
-                case Op.MulDivRem:
-                    MulDivRem();
-                    break;
-                case Op.Store:
-                    Store();
-                    break;
-                case Op.State:
-                    State();
-                    break;
-                case Op.Bl:
-                    Bl();
-                    break;
-                case Op.Dup:
-                    Dup();
-                    break;
-                case Op.Swap:
-                    Swap();
-                    break;
-                case Op.Over:
-                    Over();
-                    break;
-                case Op.Dup2:
-                    Dup2();
-                    break;
-                case Op.Bye:
-                    Environment.Exit(0);
-                    break;
-                case Op.DotS:
-                    Console.WriteLine(DotS());
-                    break;
-                case Op.Quit:
-                    Quit();
-                    break;
-                case Op.Interpret:
-                    Interpret();
-                    break;
-                case Op.And:
-                    Push(Pop() & Pop());
-                    break;
-                case Op.Or:
-                    Push(Pop() | Pop());
-                    break;
-                case Op.Plus:
-                    Push(Pop() + Pop());
-                    break;
-                case Op.Minu:
-                    Push(- Pop() + Pop());
-                    break;
-                case Op.Mult:
-                    Push(Pop() * Pop());
-                    break;
-                case Op.Less:
-                    Push(Pop() > Pop() ? FORTH_TRUE : FORTH_FALSE);
-                    break;
-                case Op.More:
-                    Push(Pop() < Pop() ? FORTH_TRUE : FORTH_FALSE);
-                    break;
-                case Op.Equal:
-                    Push(Pop() == Pop() ? FORTH_TRUE : FORTH_FALSE);
-                    break;
-                case Op.NotEqual:
-                    Push(Pop() != Pop() ? FORTH_TRUE : FORTH_FALSE);
-                    break;
-                case Op.Depth:
-                    Push(sp / CELL_SIZE);
-                    break;
-                case Op.RDepth:
-                    Push(rp / CELL_SIZE);
-                    break;
-                case Op.Invert:
-                    Push(~Pop());
-                    break;
-                case Op.Immediate:
-                    Utils.SetHighBit(ref ds[LinkToLen(dictHead)]);
-                    break;
-                case Op.Divi:
-                    var d = Pop();
-                    var u = Pop();
-                    Push(u / d);
-                    break;
-                case Op.Body:
-                    Push(Pop() + 1 + CELL_SIZE); // See create below.
-                    break;
-                case Op.Create:
-                    Push(' ');
-                    Word();
-                    if(ds[Peek()] == 0) Throw("Make needs a subsequent word in the stream.");
-                    LowerCase();
-                    DictAdd();
-
-                    PushOp(Op.NumbEx);
-                    // Need to use full cell because it gets substituted by a jmp in does>
-                    // and I don't know how many cells the number I need to jump to takes
-                    WriteCell(ds, herep, herep + CELL_SIZE);
-                    herep += CELL_SIZE;
-                    break;
-                case Op.Does:
-                    // Allows redefinition of last defined word!!
-                    // Even in gforth!!
-                    idx = Lastxt();
-                    var addrToPush = ReadCell(ds, idx + 1);
-                    
-                    var tmpHerep = herep;
-                    herep = idx;
-                    PushOp(Op.Jmp, tmpHerep);
-                    herep = tmpHerep;
-                    PushOp(Op.Numb, addrToPush);
-                    PushUntilExit(ref ip);
-                    ip = (Index)RPop();
-                    break;
-                case Op.Colo:
-                    Push(' ');
-                    Word();
-                    if(ds[Peek()] == 0) Throw("Colon needs a subsequent word in the stream.");
-                    LowerCase();
-                    DictAdd();
-                    Executing = false;
-                    break;
-                case Op.Call:
-                    n = Read7BitEncodedCell(ds, ip, out count);
-                    ip += count;
-                    RPush(ip);
-                    ip = (Index)n;
-                    break;
-                case Op.Jmp:
-                    n = Read7BitEncodedCell(ds, ip, out _);
-                    ip = (Index) n;
-                    break;
-                case Op.Exit:
-                    ip = (Index)RPop();
-                    break;
-                case Op.Branch0:
-                    flag = Pop();
-                    ip += flag == FORTH_FALSE ? ReadInt16(ds, ip) : 2 ;
-                    break;
-                case Op.Do:
-                    RPush(ReadCell(ds, ip));
-                    ip += CELL_SIZE;
-                    ToR();
-                    ToR();
-                    break;
-                case Op.I:
-                    Push(ReadCell(rs, rp - CELL_SIZE * 2));
-                    break;
-                case Op.J:
-                    Push(ReadCell(rs, rp - CELL_SIZE * 5));
-                    break;
-                case Op.Leave:
-                    RPop();
-                    RPop();
-                    ip = (Index)RPop();
-                    break;
-                case Op.Loop:
-                    limit = RPop();
-                    index = RPop();
-                    index++;
-                    bflag = index < limit; 
-                    if(bflag) {
-                        RPush(index);
-                        RPush(limit);
-                        ip += ReadInt16(ds, ip);
-                    }  else {
-                        RPop();
-                        ip += 2;
-                    }
-                    break;
-                case Op.LoopP:
-                    incr  = Pop();
-                    limit = RPop();
-                    index = RPop();
-                    index += incr;
-                    bflag = incr > 0 ? index < limit : index >= limit; 
-                    if(bflag) {
-                        RPush(index);
-                        RPush(limit);
-                        ip += ReadInt16(ds, ip);
-                    }  else {
-                        RPop();
-                        ip += 2;
-                    }
-                    break;
-                case Op.RelJmp:
-                    ip += ReadInt16(ds, ip);
-                    break;
-                default:
-                    var a = ImmediateAction(currentOp); 
-                    if(a is not null)
-                    {
-                        a();
-                    } else {
-                        Throw($"{(Op)op} bytecode not supported.");
-                    }
-                    break;
-            }
-        } while (ip != code + opLen);
-    }
     /** These are internal to be able to test them. What a bother. **/
     internal void Push(Cell n)  => ps = Utils.Add(ps, ref sp, n);
     internal Cell Pop()         => Utils.ReadBeforeIndex(ps, ref sp);
@@ -1064,7 +1134,7 @@ public class Vm {
 
     internal void RPush(Cell n) => rs = Utils.Add(rs, ref rp, n);
     internal Cell RPop()        => Utils.ReadBeforeIndex(rs, ref rp);
-    void ToR()                  => RPush(Pop());
+    void PStoRS()                  => RPush(Pop());
     void FromR()                => Push(RPop());
 
     internal void DPush(Cell n) => ds = Utils.Add(ds, ref herep, n);
@@ -1317,16 +1387,16 @@ static class Utils {
     }
 
     internal static bool Has2NumberSize(byte b)
-        => b >= (int)Op.FirstHas2Size && b < (int)Op.FirstHasCellSize;
+        => b >= (int)Token.FirstHas2Size && b < (int)Token.FirstHasCellSize;
     internal static bool HasCellSize(byte b)
-        => b >= (int)Op.FirstHasCellSize && b < (int)Op.FirstHasVarNumb;
+        => b >= (int)Token.FirstHasCellSize && b < (int)Token.FirstHasVarNumb;
     internal static bool HasVarNumberSize(byte b)
-        => b >= (int)Op.FirstHasVarNumb && b < (int) Op.FirstStringWord;
+        => b >= (int)Token.FirstHasVarNumb && b < (int) Token.FirstStringWord;
     internal static bool HasStringSize(byte b)
-        => b >= (int)Op.FirstStringWord;
+        => b >= (int)Token.FirstStringWord;
 }
 
-public enum Op {
+public enum Token {
     Error , Colo,  Does, Plus, Minu, Mult, Divi, Prin, Base, Noop,
     Count, Word, Parse, Refill, Comma, CComma, Here, At, Store, State, Bl, Dup, Exit, Immediate,
     Swap, Dup2, Drop, Drop2, Find, Bye, DotS, Interpret, Quit, Create, Body, RDepth, Depth,
@@ -1337,7 +1407,7 @@ public enum Op {
     IWhile, IRepeat, IBrakO, IBrakC,   // End of 1 byte
     Branch0, RelJmp, ImmCall, IPostponeOp,// End of 2 byte size
     NumbEx, // End of CELL Size 
-    Jmp , Numb, Call, IPostponeCall, ILiteral, IChar,// End of Var number
+    Jmp , Numb, Call, IPostCall, ILiteral, IChar,// End of Var number
     ICStr, ISStr, ISLit, // End of string words
     FirstHasVarNumb = Jmp, FirstHas2Size = Branch0, FirstHasCellSize = NumbEx,
     FirstStringWord = ICStr,
