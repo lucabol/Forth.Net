@@ -1,3 +1,12 @@
+/** ## Abstract
+This is a Forth for the .NET framework in one cs file. It is a token threaded implementation that can save its status to a very concise binary format.
+Feel free to reuse this code as you wish.  **/
+
+/** ## Preliminaries
+The ambition was to write a Forth that can be recompiled for 32 or 64 bits. I just tested the 64 bits part.
+The rest is just standard `using` stuff that I can't move to a `global.cs` file because I want to be able to simply copy
+this cs file to a project and have my Forth there.**/
+
 #if CELL32
 using Cell      = System.Int32;
 using Index     = System.Int32;
@@ -26,7 +35,8 @@ namespace Forth;
 
 public class Vm {
 
-    /** In Forth everything starts at `Quit`. Yep. It is the line interpreter. It reads a line (with `Refill`) and interprets it. **/
+/** ## The outer interpret
+In Forth everything starts at `Quit`. Yep. It is the line interpreter. It reads a line (with `Refill`) and interprets it. **/
     public void Quit()
     {
         rp = 0; Executing = true; ds[inp] = 0; // Don't reset the parameter stack as for ANS FORTH definition of QUIT.
@@ -61,6 +71,7 @@ public class Vm {
         }
     }
 
+    /** ## Interpreting numbers **/
     /** Let's tackle parsing the number first. In Forth you can express numbers in different basis. We use the standard .NET conversion
         functions here, but those support just a few basis and throw exceptions on failure (bad design). We could consider writing our own to support all basis.
         Also the code can be compiled for 32 bits cell size and maybe it works. **/
@@ -112,8 +123,9 @@ public class Vm {
         herep += howMany;
     }
 
+    /** ## Interpreting words **/
     /**
-Now that we know how to compile numbers and then it exists a magic function that executes tokens, we can go back and look at interpreting words.
+Now that we know how to compile numbers and that it exists a magic function that executes tokens, we can go back and look at interpreting words.
 In this implementation, words are separated in user defined words, primitives and immediate primitive. This is likely a bad design brought about
 by a desire of optimize prematurely. There should be an unified representation.
 
@@ -283,6 +295,7 @@ the token in an hash table. Apart from style, this is an irritating allocation i
 
     static Index LinkToLen(Index link) => link + CELL_SIZE;
 
+    /** ## Memory organization **/
     /** As we touched on the internal memory organization, it might now be time to describe it in more detail. Firstly the data space, parameter stack and
         return stack are represented as arrays of bytes. Some notes:
         * In Forth, you can access the stacks as Cells or bytes. I choose the lower denominator to simplify things.
@@ -483,6 +496,7 @@ copy this single file in a project and be done.
         Console.WriteLine($"Loaded from file {Path.Join(Environment.CurrentDirectory, fileName)}");
     }
 
+    /** ## Executing words **/
     /**
 With all of that under our belt, we can now look at `Execute`. This is `switch threaded`.
 It could be written as a table of `Token` to `Action`, but then I would lose possible
@@ -905,6 +919,7 @@ We will comment on the most interesting cases.
         } while (ip != code + opLen);
     }
 
+    /** Some details **/
     /** Now you should understand the how interpretation and compilation work. The rest is details.
         Let's look at a few of them.**/
 
@@ -1065,6 +1080,115 @@ We will comment on the most interesting cases.
         }
         Throw($"{sl: don't know this word.}");
     }
+    /** ## List of Tokens **/
+    /** In each implementation, each instruction is (Token, Operand) where Token is one byte, while operand
+        can be 1 byts, 2 bytes, Cell size, a variable number or a string. There is vast literature, but no agreement
+        on the most optimal number of primitives for a Forth system. It is a trade off between easy of porting vs 
+        performance and compactness. I stayed somewhere in the middle. Whatever seemed to be highly optimizable
+        as a single instruction became one. Having said that, if I had to do it again, I would probably have less primitives. **/
+    internal enum Token {
+        Error , Colo,  Does, Plus, Minu, Mult, Divi, Prin, Base, Noop,
+        Count, Word, Parse, Refill, Comma, CComma, Here, At, Store, State, Bl, Dup, Exit, Immediate,
+        Swap, Dup2, Drop, Drop2, Find, Bye, DotS, Interpret, Quit, Create, Body, RDepth, Depth,
+        Less, Words, TestSys, More, Equal, NotEqual, Do, Loop, LoopP, ToR, FromR, I, J, Leave, Cr,
+        Source, Type, Emit, Char, In, Over, And, Or, Allot, Cells, Exec, Invert, MulDivRem,
+        Save, Load, SaveSys, LoadSys, Included, DType, DCall, DMethod, CAt, Pad,
+        IDebug, ISemi,  IBegin, IDo, ILoop, ILoopP, IAgain, IIf, IElse, IThen,
+        IWhile, IRepeat, IBrakO, IBrakC,   // End of 1 byte
+        Branch0, RelJmp, ImmCall, IPostponeOp,// End of 2 byte size
+        NumbEx, // End of CELL Size 
+        Jmp , Numb, Call, IPostCall, ILiteral, IChar,// End of Var number
+        ICStr, ISStr, ISLit, // End of string words
+        FirstHasVarNumb = Jmp, FirstHas2Size = Branch0, FirstHasCellSize = NumbEx,
+        FirstStringWord = ICStr,
+    }
+
+    /** ## Forth defined primitives **/
+    /** Whatever is not a primitive, is implemented in Forth in the giant string below. Note that
+        comments are implemented in Forth. What other language lets you do that? I guess Lisp, SmallTalk
+        and derivatives ... **/
+    const string INIT_FORTH = @"
+: ( [char] ) parse drop drop ; immediate
+: \ 0 word drop ; immediate
+
+\ Some modified from https://theforth.net/package/minimal/current-view/README.md
+: variable create 0 , ;
+: constant create , does> @ ;
+
+\ Arithmetic
+: 1+ 1 + ;
+: 2+ 2 + ;
+: 1- 1 - ;
+: 2- 2 - ;
+: min ( n1 n2 -- n3 )  over over > if swap then drop ;
+: max ( n1 n2 -- n3 )  over over < if swap then drop ;
+: mod ( n n -- n )  1 swap */mod drop ;
+: dec 10 base ! ;
+: hex 16 base ! ;
+: 2* 2 * ;
+: negate -1 * ;
+: d- - ;
+
+\ Stack
+: rot ( x1 x2 x3 -- x2 x3 x1 )  >r  swap r> swap ;
+: -rot ( x1 x2 x3 -- x3 x2 x1 )  rot rot ;
+: nip ( x1 x2 -- x2 )  swap drop ;
+: tuck ( x1 x2 -- x2 x1 x2 )  swap over ;
+: ?dup dup 0 <> if dup then ;
+: bounds ( addr1 u -- addr2 addr3 )  over + swap ;
+: 2dup ( d1 -- d1 d1 )  over over ;
+: 2swap ( d1 d2 -- d2 d1 )  >r rot rot r> rot rot ;
+: 2over ( d1 d2 -- d1 d2 d1 )  >r >r 2dup r> r> 2swap ;
+: um/mod 2dup mod -rot / ;
+
+\ Boolean
+0 constant false
+false invert constant true
+: 0= 0 = ;
+: 0< 0 < ;
+: 0> 0 > ;
+: or ( x x -- x )  invert swap invert and invert ; ( do morgan )
+: xor ( x x -- x )  over over invert and >r swap invert and r> or ;
+: lshift ( x1 u -- x2 )  begin dup while >r  2*  r> 1 - repeat drop ;
+: endif postpone then ; immediate
+
+\ Memory
+: ? @ . ;
+: +! ( x addr -- )  swap over @ + swap ! ;
+: chars ;
+: char+ ( c-addr1 -- c-addr2 )  1 chars + ;
+: cell+ ( addr1 -- addr2 )  1 cells + ;
+: aligned ( addr -- a-addr )  cell+ 1 -   1 cells 1 - invert  and ;
+: 2! ( d addr -- )   SWAP OVER ! CELL+ ! ;
+: 2@ ( addr -- d )  DUP CELL+ @ SWAP @ ;
+
+\ Compiler
+: ' bl word find drop ;
+: ['] ' postpone literal ; immediate
+: value ( -- )  create , does> @ ;
+: defer ( ""<spaces>name"" -- )  create 0 , does> @ execute ;
+: to ( x ""<spaces>name"" -- ) 
+   state @ 
+   if  postpone [']  postpone >body postpone !  
+   else ' >body ! then ; immediate
+
+: is ( x ""<spaces>name"" -- ) 
+   state @ if  postpone to  else ['] to execute  then ; immediate
+
+\ Strings
+: space ( -- )  bl emit ;
+: spaces ( u -- ) dup 0 > if  begin dup while  space 1 -  repeat  then  drop ;
+
+\ .net inteop samples
+: .net ( type-s-addr type-c methodName-s-addr method-name-c -- ** )
+	2swap .net>type .net>method .net>call ;
+
+: escape s"" System.Uri, System"" s"" EscapeDataString"" .net ;
+: sqrt s"" System.Math"" s"" Sqrt"" .net ;
+";
+
+    /** The rest is either byte fiddling or control structures details. You should be able to understand it
+        on your own, given what explained before. If you are highly motivated.**/
     void CMove()
     {
         var u  = Pop();
@@ -1229,7 +1353,7 @@ We will comment on the most interesting cases.
     internal void Bl()    => Push(' ');
     void State() => Push(state);
 
-    /** These are internal to be able to test them. What a bother. **/
+    /* These are internal to be able to test them. What a bother. */
     internal void Push(Cell n)  => ps = Utils.Add(ps, ref sp, n);
     internal Cell Pop()         => Utils.ReadBeforeIndex(ps, ref sp);
     internal Cell Peek()        => Utils.ReadCell(ps, sp - CELL_SIZE);
@@ -1336,7 +1460,7 @@ We will comment on the most interesting cases.
             else
                 Push(Convert.ToInt64(res));
     }
-    /** It is implemented like this to avoid endianess problems **/
+    /* It is implemented like this to avoid endianess problems **/
     void CFetch()
     {
         var c = (Index)Pop();
@@ -1383,7 +1507,7 @@ We will comment on the most interesting cases.
         Push(addr);
         Push(off - startOff - 1);
     }
-    /** TODO: the delimiter in this implementation (and Forth) as to be one byte char, but UTF8 puts that into question **/
+    /* TODO: the delimiter in this implementation (and Forth) as to be one byte char, but UTF8 puts that into question */
     internal void Word(bool inKeyword = false)
     {
         var delim = (byte)Pop();
@@ -1422,85 +1546,6 @@ We will comment on the most interesting cases.
     }
     Span<byte> ToChars(Index start, Index lenInBytes)
             => new(ds, start, lenInBytes);
-    const string INIT_FORTH = @"
-: ( [char] ) parse drop drop ; immediate
-: \ 0 word drop ; immediate
-
-\ Some modified from https://theforth.net/package/minimal/current-view/README.md
-: variable create 0 , ;
-: constant create , does> @ ;
-
-\ Arithmetic
-: 1+ 1 + ;
-: 2+ 2 + ;
-: 1- 1 - ;
-: 2- 2 - ;
-: min ( n1 n2 -- n3 )  over over > if swap then drop ;
-: max ( n1 n2 -- n3 )  over over < if swap then drop ;
-: mod ( n n -- n )  1 swap */mod drop ;
-: dec 10 base ! ;
-: hex 16 base ! ;
-: 2* 2 * ;
-: negate -1 * ;
-: d- - ;
-
-\ Stack
-: rot ( x1 x2 x3 -- x2 x3 x1 )  >r  swap r> swap ;
-: -rot ( x1 x2 x3 -- x3 x2 x1 )  rot rot ;
-: nip ( x1 x2 -- x2 )  swap drop ;
-: tuck ( x1 x2 -- x2 x1 x2 )  swap over ;
-: ?dup dup 0 <> if dup then ;
-: bounds ( addr1 u -- addr2 addr3 )  over + swap ;
-: 2dup ( d1 -- d1 d1 )  over over ;
-: 2swap ( d1 d2 -- d2 d1 )  >r rot rot r> rot rot ;
-: 2over ( d1 d2 -- d1 d2 d1 )  >r >r 2dup r> r> 2swap ;
-: um/mod 2dup mod -rot / ;
-
-\ Boolean
-0 constant false
-false invert constant true
-: 0= 0 = ;
-: 0< 0 < ;
-: 0> 0 > ;
-: or ( x x -- x )  invert swap invert and invert ; ( do morgan )
-: xor ( x x -- x )  over over invert and >r swap invert and r> or ;
-: lshift ( x1 u -- x2 )  begin dup while >r  2*  r> 1 - repeat drop ;
-: endif postpone then ; immediate
-
-\ Memory
-: ? @ . ;
-: +! ( x addr -- )  swap over @ + swap ! ;
-: chars ;
-: char+ ( c-addr1 -- c-addr2 )  1 chars + ;
-: cell+ ( addr1 -- addr2 )  1 cells + ;
-: aligned ( addr -- a-addr )  cell+ 1 -   1 cells 1 - invert  and ;
-: 2! ( d addr -- )   SWAP OVER ! CELL+ ! ;
-: 2@ ( addr -- d )  DUP CELL+ @ SWAP @ ;
-
-\ Compiler
-: ' bl word find drop ;
-: ['] ' postpone literal ; immediate
-: value ( -- )  create , does> @ ;
-: defer ( ""<spaces>name"" -- )  create 0 , does> @ execute ;
-: to ( x ""<spaces>name"" -- ) 
-   state @ 
-   if  postpone [']  postpone >body postpone !  
-   else ' >body ! then ; immediate
-
-: is ( x ""<spaces>name"" -- ) 
-   state @ if  postpone to  else ['] to execute  then ; immediate
-
-\ Strings
-: space ( -- )  bl emit ;
-: spaces ( u -- ) dup 0 > if  begin dup while  space 1 -  repeat  then  drop ;
-
-\ .net inteop samples
-: .net ( type-s-addr type-c methodName-s-addr method-name-c -- ** )
-	2swap .net>type .net>method .net>call ;
-
-: escape s"" System.Uri, System"" s"" EscapeDataString"" .net ;
-: sqrt s"" System.Math"" s"" Sqrt"" .net ;
-";
     const string PRELIM_TEST = @"
 CR CR SOURCE TYPE ( Preliminary test ) CR
 SOURCE ( These lines test SOURCE, TYPE, CR and parenthetic comments ) TYPE CR
@@ -1804,29 +1849,12 @@ static class Utils {
     }
 
     internal static bool Has2NumberSize(byte b)
-        => b >= (int)Token.FirstHas2Size && b < (int)Token.FirstHasCellSize;
+        => b >= (int)Vm.Token.FirstHas2Size && b < (int)Vm.Token.FirstHasCellSize;
     internal static bool HasCellSize(byte b)
-        => b >= (int)Token.FirstHasCellSize && b < (int)Token.FirstHasVarNumb;
+        => b >= (int)Vm.Token.FirstHasCellSize && b < (int)Vm.Token.FirstHasVarNumb;
     internal static bool HasVarNumberSize(byte b)
-        => b >= (int)Token.FirstHasVarNumb && b < (int) Token.FirstStringWord;
+        => b >= (int)Vm.Token.FirstHasVarNumb && b < (int) Vm.Token.FirstStringWord;
     internal static bool HasStringSize(byte b)
-        => b >= (int)Token.FirstStringWord;
-}
-
-public enum Token {
-    Error , Colo,  Does, Plus, Minu, Mult, Divi, Prin, Base, Noop,
-    Count, Word, Parse, Refill, Comma, CComma, Here, At, Store, State, Bl, Dup, Exit, Immediate,
-    Swap, Dup2, Drop, Drop2, Find, Bye, DotS, Interpret, Quit, Create, Body, RDepth, Depth,
-    Less, Words, TestSys, More, Equal, NotEqual, Do, Loop, LoopP, ToR, FromR, I, J, Leave, Cr,
-    Source, Type, Emit, Char, In, Over, And, Or, Allot, Cells, Exec, Invert, MulDivRem,
-    Save, Load, SaveSys, LoadSys, Included, DType, DCall, DMethod, CAt, Pad,
-    IDebug, ISemi,  IBegin, IDo, ILoop, ILoopP, IAgain, IIf, IElse, IThen,
-    IWhile, IRepeat, IBrakO, IBrakC,   // End of 1 byte
-    Branch0, RelJmp, ImmCall, IPostponeOp,// End of 2 byte size
-    NumbEx, // End of CELL Size 
-    Jmp , Numb, Call, IPostCall, ILiteral, IChar,// End of Var number
-    ICStr, ISStr, ISLit, // End of string words
-    FirstHasVarNumb = Jmp, FirstHas2Size = Branch0, FirstHasCellSize = NumbEx,
-    FirstStringWord = ICStr,
+        => b >= (int)Vm.Token.FirstStringWord;
 }
 

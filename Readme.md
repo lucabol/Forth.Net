@@ -26,15 +26,16 @@ nforth Test1.fth Test2.fth -e 's\" myfile.io" save'
 
 * You save the user portion of the dictionary with `S" myfile.io" save`. You load it with `S" myfile.io" load`.
 * You save the whole dictionary, system included, with `S" myfile.io" savesys`. You load it with `S" myfile.io" loadsys`.
-* Calling into .NET APIs is achieved with these simple words. (fyi just static methods with string or numbers for now).
+* Calling into .NET APIs is achieved with these simple words. (FYI just static methods with string or numbers for now).
 
 ```factor
 : escape s" System.Uri, System" s" EscapeDataString" .net ;
 : sqrt   s" System.Math"        s" Sqrt"             .net ;
 ```
 
-* Calling from .NET to Forth is achieved using the public APIs on the `Vm` class. Look at the `Program` folder for a simple example. 
-* See all the suppurted words with `words`.
+* Calling from .NET to Forth is achieved using the public APIs on the `Vm` class. Look at the `Forth.Net.Program` folder for a simple example. 
+* To include the library, copy the file `Vm.cs` in your project. It is lightly literate programmed. See [here](Forth.Net/Readme.md)
+* See all the supported words with `words`.
 * Perform a system test with `testsys`. Your results should look like at the bottom of this doc.
 * Type `debug` if curious.
 * Type `nforth --help` for less used options.
