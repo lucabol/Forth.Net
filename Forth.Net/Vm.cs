@@ -402,17 +402,18 @@ the token in an hash table. Apart from style, this is an irritating allocation i
         savedDictHead    = herep;
         herep           += CELL_SIZE;
 
-        /** This table contains the immediate primitive words. These words are executed at compile time.
-            The management of conditionals and loop constructs is messy.
-        
-            Take the `if` statement, at the point where the interpret encounters it, it doesn't yet know
-            where it has to jump to in case the condition is not satisfied.
-            It embeds a 'conditional' branching instruction, leaving two bytes
-            empty for the branching target. It also pushes the address of the empty bytes.
-            When the interpret encounters `else` or `then`, it backfill those empty bytes with
-            the right value so that the branch instruction jumps to the correct point.
-        
-            Other flow control structures behave similarly. **/
+/**
+This table contains the immediate primitive words. These words are executed at compile time.
+The management of conditionals and loop constructs is messy.
+
+Take the `if` statement, at the point where the interpret encounters it, it doesn't yet know
+where it has to jump to in case the condition is not satisfied.
+It embeds a 'conditional' branching instruction, leaving two bytes
+empty for the branching target. It also pushes the address of the empty bytes.
+When the interpret encounters `else` or `then`, it backfill those empty bytes with
+the right value so that the branch instruction jumps to the correct point.
+
+Other flow control structures behave similarly. **/
         ImmediatePrimitives = new()
         {
             { "debug",      (Token.IDebug,     () => Debug = !Debug) },
