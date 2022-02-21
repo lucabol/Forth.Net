@@ -1,8 +1,14 @@
+~~~~csharp
 namespace Forth;
 
 public class Vm {
 
-    /** In Forth everything starts at `Quit`. Yep. It is the line interpreter. It reads a line (with `Refill`) and interprets it. **/
+    
+~~~~
+
+ In Forth everything starts at `Quit`. Yep. It is the line interpreter. It reads a line (with `Refill`) and interprets it. 
+
+~~~~csharp
     public void Quit()
     {
         rp = 0; Executing = true; ds[inp] = 0; // Don't reset the parameter stack as for ANS FORTH definition of QUIT.
@@ -15,7 +21,12 @@ public class Vm {
         }
     }
 
-    /** Then comes the word interpret. It tries to interpret the text between spaces first as a word, then as a number **/
+    
+~~~~
+
+ Then comes the word interpret. It tries to interpret the text between spaces first as a word, then as a number 
+
+~~~~csharp
     void Interpret()
     {
         while(true)
@@ -37,9 +48,14 @@ public class Vm {
         }
     }
 
-    /** Let's tackle parsing the number first. In Forth you can express numbers in different basis. We use the standard .NET conversion
+    
+~~~~
+
+ Let's tackle parsing the number first. In Forth you can express numbers in different basis. We use the standard .NET conversion
         functions here, but those support just a few basis and throw exceptions on failure (bad design). We could consider writing our own to support all basis.
-        Also the code can be compiled for 32 bits cell size and maybe it works. **/
+        Also the code can be compiled for 32 bits cell size and maybe it works. 
+
+~~~~csharp
     bool TryParseNumber(string s, out Cell n)
     {
         var b = ds[basep];
@@ -63,8 +79,13 @@ public class Vm {
         return false;
     }
 
-    /** Now that we can parse a number, we can interpret it. This is a token interpreter. Word as described as tokens of various kind. You are either executing
-        a token, or compiling it inside of another word (i.e., when using the defining word `:`). **/
+    
+~~~~
+
+ Now that we can parse a number, we can interpret it. This is a token interpreter. Word as described as tokens of various kind. You are either executing
+        a token, or compiling it inside of another word (i.e., when using the defining word `:`). 
+
+~~~~csharp
     void InterpretNumber(Cell value)
     {
         if(Executing)
@@ -73,14 +94,24 @@ public class Vm {
             PushOp(Token.Numb, value);
     }
 
-    /** Executing a token is a bit complicated. Let's look first at compiling it. Compilation in this model means adding a token on top of the data stack.
-        In Forth, the data stack is where user defined words live and we are in the middle of defining one. **/
+    
+~~~~
+
+ Executing a token is a bit complicated. Let's look first at compiling it. Compilation in this model means adding a token on top of the data stack.
+        In Forth, the data stack is where user defined words live and we are in the middle of defining one. 
+
+~~~~csharp
     void PushOp(Token op) {
         ds[herep] = (Code)op;
         herep++;
     }
-    /** Sometimes tokens have parameters. If they have a numeric one, we encode it so to minimize the overall size both in memory (for cache sake) and on disk.
-        For that we use the [GitVarInt](https://www.nuget.org/packages/GitVarInt/) library. **/
+    
+~~~~
+
+ Sometimes tokens have parameters. If they have a numeric one, we encode it so to minimize the overall size both in memory (for cache sake) and on disk.
+        For that we use the [GitVarInt](https://www.nuget.org/packages/GitVarInt/) library. 
+
+~~~~csharp
     void PushOp(Token op, Cell value)
     {
         PushOp(op);
@@ -88,7 +119,9 @@ public class Vm {
         herep += howMany;
     }
 
-    /**
+    
+~~~~
+
 Now that we know how to compile numbers and then it exists a magic function that executes tokens, we can go back and look at interpreting words.
 In this implementation, words are separated in user defined words, primitives and immediate primitive. This is likely a bad design brought about
 by a desire of optimize prematurely. There should be an unified representation.
@@ -98,7 +131,9 @@ execute/compile the corresponding token. If it is an immediate primitive, execut
 
 It is awkward that finding the user defined word relies on parameters on the stack, while the other cases use a .net string representation to find
 the token in an hash table. Apart from style, this is an irritating allocation in the main loop that could be optimized away with some work.
-    **/
+    
+
+~~~~csharp
     bool InterpretWord(string aword)
     {
         LowerCase();
@@ -135,12 +170,16 @@ the token in an hash table. Apart from style, this is an irritating allocation i
         return false;
     }
 
-    /** Simple primitives map a word with the token defining it. **/
+    
+~~~~
+
+ Simple primitives map a word with the token defining it. 
+
+~~~~csharp
     readonly Dictionary<string, Token> WordToSimpleOp = new()
     {
         { "."           , Token.Prin },
         { "count"       , Token.Count },
-        { "words"       , Token.Words },
         { "cells"       , Token.Cells },
         { "allot"       , Token.Allot },
         { "and"         , Token.And },
@@ -209,16 +248,26 @@ the token in an hash table. Apart from style, this is an irritating allocation i
         { ".net>call"   , Token.DCall },
     };
 
-    /** On the other hand, immediate actions need to be executed at compile time when their token is encountered.
+    
+~~~~
+
+ On the other hand, immediate actions need to be executed at compile time when their token is encountered.
         This is indexed by the string word, which is what we see in the interpreter. But later I discovered the need
-        to index it by operator as well, so I bolted it on as a tuple. We'll look in more depth at how they work later. **/
+        to index it by operator as well, so I bolted it on as a tuple. We'll look in more depth at how they work later. 
+
+~~~~csharp
     readonly Dictionary<string, (Token, Action)> ImmediatePrimitives = new();
 
-    /** User defined words are stored in the data space as a linked list. Each word is in the format:
+    
+~~~~
+
+ User defined words are stored in the data space as a linked list. Each word is in the format:
         -> Cell   <-> One Byte <-> Bytes    <-> Bytes
         | Next Link|  Len Word  | Word chars | Tokens |
         This function follow the links, staring at `dictHead`, until it finds the word on top of the parameter stack.
-        As an optimization, the length field uses the higher bit to store if the word is an immediate one (save one byte, save the planet). **/
+        As an optimization, the length field uses the higher bit to store if the word is an immediate one (save one byte, save the planet). 
+
+~~~~csharp
     internal void FindUserDefinedWord()
     {
         var caddr = (Index)Pop();
@@ -250,21 +299,30 @@ the token in an hash table. Apart from style, this is an irritating allocation i
         Push(0);
     }
 
-    /** These functions abstract out the details of the word structure. At least that was the idea. In practice that knowledge has leaked
-        in other parts of the code base. **/
+    
+~~~~
+
+ These functions abstract out the details of the word structure. At least that was the idea. In practice that knowledge has leaked
+        in other parts of the code base. 
+
+~~~~csharp
     static Index LinkToCode(Index link, Index wordLen)
         // Addr + Link size + len size  + word chars
         => link + CELL_SIZE + CHAR_SIZE + CHAR_SIZE * wordLen;
 
     static Index LinkToLen(Index link) => link + CELL_SIZE;
 
-    /** As we touched on the internal memory organization, it might now be time to describe it in more detail. Firstly the data space, parameter stack and
+    
+~~~~
+
+ As we touched on the internal memory organization, it might now be time to describe it in more detail. Firstly the data space, parameter stack and
         return stack are represented as arrays of bytes. Some notes:
         * In Forth, you can access the stacks as Cells or bytes. I choose the lower denominator to simplify things.
         * I didn't use the .NET `Stack` class because it doesn't let you easily index into it.
         * One could use `unsafe` and pointers to avoid checking boundaries at each access, but then you could use the library just from unsafe code.
-        **/
+        
 
+~~~~csharp
     Index sp     = 0;                   // Top of parameter stack.
     Index rp     = 0;                   // Top for return stack.
     Index herep  = 0;                   // Top of data space.
@@ -272,9 +330,13 @@ the token in an hash table. Apart from style, this is an irritating allocation i
     AUnit[] rs;                         // Return stack.
     AUnit[] ds;                         // Data space.
 
-    /** Then come some pointers that map areas in the data space that are used by the system or point to some system cells.
-        They get initialized in the Vm constructor. Also, some other random state used by the system. **/
+    
+~~~~
 
+ Then come some pointers that map areas in the data space that are used by the system or point to some system cells.
+        They get initialized in the Vm constructor. Also, some other random state used by the system. 
+
+~~~~csharp
     Index dictHead;                     // The last word added to the dictionary.
 
     readonly Index source;              // Input buffer.
@@ -298,23 +360,43 @@ the token in an hash table. Apart from style, this is an irritating allocation i
 
     public bool Debug { get ; set; }    // Doesn't do much as of now, but we can extend it to print out a lot of useful thins (i.e., token disassembly).
 
-    /** I decided for the system to use UTF8 internally to save space, despite .NET running on a 'kind of' UTF16. I convert at the boundary.
-        A cell can be either 64 bits or 32 bits. I have not tested the latter. **/
+    
+~~~~
+
+ I decided for the system to use UTF8 internally to save space, despite .NET running on a 'kind of' UTF16. I convert at the boundary.
+        A cell can be either 64 bits or 32 bits. I have not tested the latter. 
+
+~~~~csharp
     internal const Index CHAR_SIZE = 1;
     internal const Index CELL_SIZE = sizeof(Cell);
 
     const Cell FORTH_TRUE  = -1;
     const Cell FORTH_FALSE = 0;
 
-    /** This is very important. By setting this field you can get the interpret to read the next line of text from wherever (typically Console or file). **/
+    
+~~~~
+
+ This is very important. By setting this field you can get the interpret to read the next line of text from wherever (typically Console or file). 
+
+~~~~csharp
     public Func<string>? NextLine = null;
 
-    /** These cache the last dotnet type and method, so that you can call multiple methods on the same type ergonomically. **/
+    
+~~~~
+
+ These cache the last dotnet type and method, so that you can call multiple methods on the same type ergonomically. 
+
+~~~~csharp
     Type lastType = typeof(Console);
     MethodInfo? lastMethod;
 
-    /** Let's see how the pointers are initialized. First some debatable defaults for the most important
-        data source areas. **/
+    
+~~~~
+
+ Let's see how the pointers are initialized. First some debatable defaults for the most important
+        data source areas. 
+
+~~~~csharp
     public Vm(
         Index parameterStackSize =  16 * 1_024,
         Index returnStackSize    =  16 * 1_024,
@@ -324,12 +406,22 @@ the token in an hash table. Apart from style, this is an irritating allocation i
         Index wordSize           =       1_024
         ) {
 
-        /** These are the arrays storing the three most important memory areas. **/
+        
+~~~~
+
+ These are the arrays storing the three most important memory areas. 
+
+~~~~csharp
         ps   = new AUnit[parameterStackSize];
         rs   = new AUnit[returnStackSize];
         ds   = new AUnit[dataStackSize];
 
-        /** And we initialize all the pointers **/
+        
+~~~~
+
+ And we initialize all the pointers 
+
+~~~~csharp
         inputBufferSize  = sourceSize;
         wordBufferSize   = wordSize;
 
@@ -364,7 +456,10 @@ the token in an hash table. Apart from style, this is an irritating allocation i
         savedDictHead    = herep;
         herep           += CELL_SIZE;
 
-        /** This table contains the immediate primitive words. These words are executed at compile time.
+        
+~~~~
+
+ This table contains the immediate primitive words. These words are executed at compile time.
             The management of conditionals and loop constructs is messy.
         
             Take the `if` statement, at the point where the interpret encounters it, it doesn't yet know
@@ -374,7 +469,9 @@ the token in an hash table. Apart from style, this is an irritating allocation i
             When the interpret encounters `else` or `then`, it backfill those empty bytes with
             the right value so that the branch instruction jumps to the correct point.
         
-            Other flow control structures behave similarly. **/
+            Other flow control structures behave similarly. 
+
+~~~~csharp
         ImmediatePrimitives = new()
         {
             { "debug",      (Token.IDebug,     () => Debug = !Debug) },
@@ -408,12 +505,16 @@ the token in an hash table. Apart from style, this is an irritating allocation i
             { "s\"",         (Token.ISStr,     EmbedString(Token.ISStr)) },
         };
 
-        /**
+        
+~~~~
+
 After everything is set up, we can now load the initialization files. In Forth, normally 
 a good part of the interpret is written in Forth itself. Implementations vary with regard to
 how many instructions are primitives. The obvious trade-offs apply.
 
-Here we try to load from a binary file first, if present. **/
+Here we try to load from a binary file first, if present. 
+
+~~~~csharp
         if(File.Exists("init.io"))
         {
             FromDotNetString("init.io");
@@ -428,7 +529,12 @@ Here we try to load from a binary file first, if present. **/
 
         Reset();
     }
-    /** In our token based interpret, loading and saving the system is a trivial operation. Just copy the bytes. **/
+    
+~~~~
+
+ In our token based interpret, loading and saving the system is a trivial operation. Just copy the bytes. 
+
+~~~~csharp
     void SaveSystem(bool all = false)
     {
         var start = all ? 0 : userStart ;
@@ -450,7 +556,9 @@ Here we try to load from a binary file first, if present. **/
         Console.WriteLine($"Loaded from file {Path.Join(Environment.CurrentDirectory, fileName)}");
     }
 
-    /**
+    
+~~~~
+
 With all of that under our belt, we can now look at `Execute`. This is `switch threaded`.
 It could be written as a table of `Token` to `Action`, but then I would lose possible
 performance tricks that the compiler can play to speed it up (i.e., using function pointers).
@@ -460,8 +568,9 @@ the associated action. The action might change the instruction pointer (i.e., ju
 we get back to the top of the loop, we might be executing at a very different `ip` from where started.
 
 We will comment on the most interesting cases.
-    **/
+    
 
+~~~~csharp
     void Execute(Token op, Cell? data) {
 
         Index opLen = PushExecOp(op, data); // Store the token and data in the code area so IP can point to it.
@@ -476,9 +585,6 @@ We will comment on the most interesting cases.
             bool bflag;
 
             switch(token) {
-                case Token.Words:
-                    Console.WriteLine(string.Join(" ", Words()));
-                    break;
                 case Token.Source:
                     Source();
                     break;
@@ -491,16 +597,26 @@ We will comment on the most interesting cases.
                 case Token.Type:
                     Console.Write(ToDotNetString());
                     break;
-                /** A string literal gets stored immediately after the ip. **/
+                
+~~~~
+
+ A string literal gets stored immediately after the ip. 
+
+~~~~csharp
                 case Token.ISLit:
                     count = ds[ip];
                     Push(ip + 1);
                     Push(count);
                     ip += count + 1;
                     break;
-                /** Postponing is a two step process. At compile time, we embed one of the two tokens below.
+                
+~~~~
+
+ Postponing is a two step process. At compile time, we embed one of the two tokens below.
                     They allow postponing either user defined functions or primitives. For immediate primitives, 
-                    postponing means embedding a token to execute the action. See description of `Postpone()` later.**/
+                    postponing means embedding a token to execute the action. See description of `Postpone()` later.
+
+~~~~csharp
                 case Token.IPostCall:
                     n = Read7BitEncodedCell(ds, ip, out count);
                     PushOp(Token.Call, n);
@@ -519,7 +635,12 @@ We will comment on the most interesting cases.
                 case Token.Allot:
                     herep += (Index)Pop();
                     break;
-                /** These three tokens enable my rudimentary (static methods) dotnet integration. **/
+                
+~~~~
+
+ These three tokens enable my rudimentary (static methods) dotnet integration. 
+
+~~~~csharp
                 case Token.DType:
                     var typeName = ToDotNetString();
                     var aType = Type.GetType(typeName);
@@ -564,10 +685,15 @@ We will comment on the most interesting cases.
                     Push(idx);
                     ip += idx + 1;
                     break;
-                /** Numb and NumbEx are two ways to embed a number in the ip stream. The latter is needed 
+                
+~~~~
+
+ Numb and NumbEx are two ways to embed a number in the ip stream. The latter is needed 
                     because of the control structures (i.e., loop, if, ...). We need to use a full cell to store
                     the jumping point as we don't know upfront where we are going to jump to, hence how many bytes
-                    we are going to need to store the address. **/
+                    we are going to need to store the address. 
+
+~~~~csharp
                 case Token.Numb:
                     n = Read7BitEncodedCell(ds, ip, out count);
                     Push(n);
@@ -723,10 +849,15 @@ We will comment on the most interesting cases.
                 case Token.Body:
                     Push(Pop() + 1 + CELL_SIZE); // See create below.
                     break;
-                /** `create ... does>` is the pearl of Forth, but its implementation is complex. `create`
+                
+~~~~
+
+ `create ... does>` is the pearl of Forth, but its implementation is complex. `create`
                     gives a byte address in the data space a name adding it to the dictionary. It also embed
                     a token in the instruction stream to push the created address when executed, so that
-                    this works `create bob 10 , bob ?`. Here is a place when we need to use `NumbEx`. **/
+                    this works `create bob 10 , bob ?`. Here is a place when we need to use `NumbEx`. 
+
+~~~~csharp
                 case Token.Create:
                     Push(' ');
                     Word();
@@ -740,11 +871,16 @@ We will comment on the most interesting cases.
                     WriteCell(ds, herep, herep + CELL_SIZE);
                     herep += CELL_SIZE;
                     break;
-                /** Here stuff is tricky. First we get the address for the code of the last `created` word
+                
+~~~~
+
+ Here stuff is tricky. First we get the address for the code of the last `created` word
                     (where `create` stored the `NumbEx addr`). We then override it with a jump to the current
                     `ip`. Then we store an instruction to push the address of the last created word. Finally,
                     we copy all the remaining tokens until we encounter Exit. This allows the following to
-                    work and print `10`: `: var create  , does> ? ;   10 var bob  bob`**/
+                    work and print `10`: `: var create  , does> ? ;   10 var bob  bob`
+
+~~~~csharp
                 case Token.Does:
                     // Allows adding code to the last `defined` word, not just last `created` one!!
                     // Even in gforth!!
@@ -759,8 +895,13 @@ We will comment on the most interesting cases.
                     PushUntilExit(ref ip);
                     ip = (Index)RPop();
                     break;
-                /** Colon `:`, despite its importance, is utterly simple. Get the next word from the input
-                    buffer, add it to the dictionary and move the interpret to compile mode. **/
+                
+~~~~
+
+ Colon `:`, despite its importance, is utterly simple. Get the next word from the input
+                    buffer, add it to the dictionary and move the interpret to compile mode. 
+
+~~~~csharp
                 case Token.Colo:
                     Push(' ');
                     Word();
@@ -769,7 +910,12 @@ We will comment on the most interesting cases.
                     DictAdd();
                     Executing = false;
                     break;
-                /** A `call` stores the ip on the return stack, while `jmp` just moves the ip. **/
+                
+~~~~
+
+ A `call` stores the ip on the return stack, while `jmp` just moves the ip. 
+
+~~~~csharp
                 case Token.Call:
                     n = Read7BitEncodedCell(ds, ip, out count);
                     ip += count;
@@ -780,16 +926,26 @@ We will comment on the most interesting cases.
                     n = Read7BitEncodedCell(ds, ip, out _);
                     ip = (Index) n;
                     break;
-                /** `exit` gets the ip from the return stack **/
+                
+~~~~
+
+ `exit` gets the ip from the return stack 
+
+~~~~csharp
                 case Token.Exit:
                     ip = (Index)RPop();
                     break;
-                /** Here come all the instructions for control flow control in a stack based Vm.
+                
+~~~~
+
+ Here come all the instructions for control flow control in a stack based Vm.
                     I recommend stepping through a `do ... loop` to understand the tricky details.
                     Generally, the return stack contains `ip after the loop | limit | index`.
                     'ip after the loop` is needed by the `leave` instruction, which needs to know where
                     to go. There might be a way to pre-calculate this at compile time, but I didn't find it.
-                **/
+                
+
+~~~~csharp
                 case Token.Branch0:
                     flag = Pop();
                     ip += flag == FORTH_FALSE ? ReadInt16(ds, ip) : 2 ;
@@ -840,14 +996,24 @@ We will comment on the most interesting cases.
                         ip += 2;
                     }
                     break;
-                /** For control structures we use relative jumps of 2 bytes, not to waste a full cell for them.
-                    If you have an `if` statement longer than `FFFFFFFF` bytes, you are screwed. **/
+                
+~~~~
+
+ For control structures we use relative jumps of 2 bytes, not to waste a full cell for them.
+                    If you have an `if` statement longer than `FFFFFFFF` bytes, you are screwed. 
+
+~~~~csharp
                 case Token.RelJmp:
                     ip += ReadInt16(ds, ip);
                     break;
                 default:
-                    /** We can treat all the immediate primitives in a generic way, by just calling their
-                        associated action. **/
+                    
+~~~~
+
+ We can treat all the immediate primitives in a generic way, by just calling their
+                        associated action. 
+
+~~~~csharp
                     var a = ImmediateAction(token); 
                     if(a is not null)
                         a();
@@ -855,12 +1021,15 @@ We will comment on the most interesting cases.
                         Throw($"{(Token)op} bytecode not supported.");
                     break;
             }
-        /** When do we stop looping? It took me a while to get this one right. The `ip` wonders around the
-            data space following all the `call` and `jmp`,but, eventually, it comes back where it started. **/
+        
+~~~~
+
+ When do we stop looping? It took me a while to get this one right. The `ip` wonders around the
+            data space following all the `call` and `jmp`,but, eventually, it comes back where it started. 
+
+~~~~csharp
         } while (ip != code + opLen);
     }
-
-    /** Now you should understand the how interpretation and compilation work. The rest is details.**/
     void BranchAndMark() { PushOp(Token.Branch0); Push(herep); herep += 2;}
     void EmbedInPoppedJmpFwd() {
             PushOp(Token.RelJmp);
@@ -940,23 +1109,7 @@ We will comment on the most interesting cases.
     }
     public IEnumerable<string> Words()
     {
-        List<string> userWords = new();
-
-        var dp = dictHead;
-        while(true)
-        {
-            if(dp == 0) break;
-
-            var wordNameStart = dp + CELL_SIZE;
-            var wordLenRaw    = ds[wordNameStart];
-            var wordLen       = Utils.ResetHighBit(wordLenRaw);
-            var wordSpan      = new Span<AChar>(ds, wordNameStart + 1 * CHAR_SIZE, wordLen);
-            var wordName      = Encoding.UTF8.GetString(wordSpan);
-            userWords.Add(wordName);
-
-            dp = (Index)ReadCell(ds, dp);
-        }
-        return WordToSimpleOp.Keys.Concat(ImmediatePrimitives.Keys).Concat(userWords).OrderBy(s => s);
+        return WordToSimpleOp.Keys.Concat(ImmediatePrimitives.Keys);
     }
 
     // TODO: clean this up, it now works because the default value of Op is 0 -> Error. It should use some kind of multidictionary here.
@@ -1152,7 +1305,12 @@ We will comment on the most interesting cases.
     internal void Bl()    => Push(' ');
     void State() => Push(state);
 
-    /** These are internal to be able to test them. What a bother. **/
+    
+~~~~
+
+ These are internal to be able to test them. What a bother. 
+
+~~~~csharp
     internal void Push(Cell n)  => ps = Utils.Add(ps, ref sp, n);
     internal Cell Pop()         => Utils.ReadBeforeIndex(ps, ref sp);
     internal Cell Peek()        => Utils.ReadCell(ps, sp - CELL_SIZE);
@@ -1259,7 +1417,12 @@ We will comment on the most interesting cases.
             else
                 Push(Convert.ToInt64(res));
     }
-    /** It is implemented like this to avoid endianess problems **/
+    
+~~~~
+
+ It is implemented like this to avoid endianess problems 
+
+~~~~csharp
     void CFetch()
     {
         var c = (Index)Pop();
@@ -1306,7 +1469,12 @@ We will comment on the most interesting cases.
         Push(addr);
         Push(off - startOff - 1);
     }
-    /** TODO: the delimiter in this implemenation (and Forth) as to be one byte char, but UTF8 puts that into question **/
+    
+~~~~
+
+ TODO: the delimiter in this implemenation (and Forth) as to be one byte char, but UTF8 puts that into question 
+
+~~~~csharp
     internal void Word(bool inKeyword = false)
     {
         var delim = (byte)Pop();
@@ -1425,7 +1593,7 @@ public enum Token {
     Error , Colo,  Does, Plus, Minu, Mult, Divi, Prin, Base, Noop,
     Count, Word, Parse, Refill, Comma, CComma, Here, At, Store, State, Bl, Dup, Exit, Immediate,
     Swap, Dup2, Drop, Drop2, Find, Bye, DotS, Interpret, Quit, Create, Body, RDepth, Depth,
-    Less, Words, More, Equal, NotEqual, Do, Loop, LoopP, ToR, FromR, I, J, Leave, Cr,
+    Less, More, Equal, NotEqual, Do, Loop, LoopP, ToR, FromR, I, J, Leave, Cr,
     Source, Type, Emit, Char, In, Over, And, Or, Allot, Cells, Exec, Invert, MulDivRem,
     Save, Load, SaveSys, LoadSys, Included, DType, DCall, DMethod, CAt, Pad,
     IDebug, ISemi,  IBegin, IDo, ILoop, ILoopP, IAgain, IIf, IElse, IThen,
@@ -1437,4 +1605,4 @@ public enum Token {
     FirstHasVarNumb = Jmp, FirstHas2Size = Branch0, FirstHasCellSize = NumbEx,
     FirstStringWord = ICStr,
 }
-
+~~~~
