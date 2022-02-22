@@ -7,8 +7,4 @@
     <AnalysisMode>Default</AnalysisMode>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="GitVarInt" Version="0.1.0" />
-  </ItemGroup>
-
 </Project>

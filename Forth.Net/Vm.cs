@@ -27,8 +27,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using static Forth.Utils;
 
-using GitVarInt;
-
 [assembly:InternalsVisibleTo("Forth.Net.Tests")]
 
 namespace Forth;
@@ -1843,6 +1841,7 @@ static class Utils {
     }
 
     internal static void Write7BitEncodedCell(Code[] codes, Index index, Cell value, out Index howMany) {
+        //howMany = Write(codes, index, value);
         using var stream = new MemoryStream(codes, index, 10);
         howMany = (Index)stream.Position;
         stream.WriteVarInt(value);
@@ -1857,5 +1856,89 @@ static class Utils {
         => b >= (int)Vm.Token.FirstHasVarNumb && b < (int) Vm.Token.FirstStringWord;
     internal static bool HasStringSize(byte b)
         => b >= (int)Vm.Token.FirstStringWord;
+
+    static int ReadVarInt32(this Stream stream) => ZigZagDecode(stream.ReadVarUInt32());
+
+    static uint ReadVarUInt32(this Stream stream)
+    {
+        byte b = ReadByte(stream);
+        uint value = (uint)(b & 127);
+
+        while ((b & 128) != 0)
+        {
+            value += 1;
+            if (value == 0 || (value & 0xfe000000u) != 0)
+                Throw("Decode overflow");
+            b = ReadByte(stream);
+            value = (value << 7) + (uint)(b & 127);
+        }
+
+        return value;
+    }
+
+    static long ReadVarInt64(this Stream stream) => ZigZagDecode(stream.ReadVarUInt64());
+
+    static ulong ReadVarUInt64(this Stream stream)
+    {
+        byte b = ReadByte(stream);
+        ulong value = (ulong)(b & 127);
+
+        while ((b & 128) != 0)
+        {
+            value += 1;
+            if (value == 0 || (value & 0xfe00000000000000ul) != 0)
+                Throw("Decode overflow");
+            b = ReadByte(stream);
+            value = (value << 7) + (ulong)(b & 127);
+        }
+
+        return value;
+    }
+
+    static void WriteVarInt(this Stream stream, int value) => stream.WriteVarInt(ZigZagEncode(value));
+
+    static void WriteVarInt(this Stream stream, uint value)
+    {
+        Span<byte> buffer = stackalloc byte[5];
+        int offset = 5;
+
+        buffer[--offset] = (byte)(value & 0x7F);
+
+        while ((value >>= 7) != 0)
+            buffer[--offset] = (byte)(0x80 | (--value & 0x7F));
+
+        while (offset < 5)
+            stream.WriteByte(buffer[offset++]);
+    }
+
+    static void WriteVarInt(this Stream stream, long value) => stream.WriteVarInt(ZigZagEncode(value));
+
+    static void WriteVarInt(this Stream stream, ulong value)
+    {
+        Span<byte> buffer = stackalloc byte[10];
+        int offset = 10;
+
+        buffer[--offset] = (byte)(value & 0x7F);
+
+        while ((value >>= 7) != 0)
+            buffer[--offset] = (byte)(0x80 | (--value & 0x7F));
+
+        while (offset < 10)
+            stream.WriteByte(buffer[offset++]);
+    }
+
+    static uint ZigZagEncode(int value)   => ((uint)value << 1) ^ (uint)-(int)((uint)value >> 31);
+    static ulong ZigZagEncode(long value) => ((ulong)value << 1) ^ (ulong)-(long)((ulong)value >> 63);
+    static int ZigZagDecode(uint value)   => (int)(value >> 1) ^ -((int)value & 0x1);
+    static long ZigZagDecode(ulong value) => (long)(value >> 1) ^ -((long)value & 0x1);
+
+    private static byte ReadByte(Stream stream)
+    {
+        int b = stream.ReadByte();
+        if (b == -1)
+            Throw("Unexpected end");
+
+        return (byte)b;
+    }
 }
 
