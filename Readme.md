@@ -37,7 +37,7 @@ nforth -e 's\" myfile.io" load aword'
 ```
 
 * Call from .NET to Forth with the public APIs on the `Vm` class. Look at the `Forth.Net.Program` folder for a simple example. 
-* To include the library, copy the file `Vm.cs` in your project. It is lightly literate programmed. See [here](Forth.Net/Readme.md)
+* To include the library, copy the file `Vm.cs` or reference the nuget package `Forth.Net` in your project. It is lightly literate programmed. See [here](Forth.Net)
 * See all the supported words with `words`.
 * Perform a system test with `testsys`. Your results should look like the text at the bottom of this doc.
 * Type `debug` if curious.

@@ -71,7 +71,7 @@ static void DisplayHelp<T>(ParserResult<T> result, IEnumerable<Error> errs)
 string NextLine() {
     
         if(CursorLeft != 0) WriteLine();
-        if(!options.HideStack) ColorLine(ConsoleColor.Gray, vm.DotS());
+        if(!options.HideStack) ColorLine(ConsoleColor.Gray, vm.StackString());
 
         System.ReadLine.AutoCompletionHandler = new AutoCompletionHandler(vm);
 
