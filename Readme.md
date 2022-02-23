@@ -29,6 +29,11 @@ nforth -e 's\" myfile.io" load aword'
 
 * Save the user portion of the dictionary with `S" myfile.io" save`. You load it with `S" myfile.io" load`.
 * Save the whole dictionary, system included, with `S" myfile.io" savesys`. You load it with `S" myfile.io" loadsys`.
+* To use the library, copy the file `Vm.cs` or reference the nuget package `Forth.Net`. Go [here](Forth.Net) for usage notes and implementation details.
+* See all the supported words with `words`.
+* Perform a system test with `testsys`. Your results should look like the text at the bottom of this doc.
+* Type `debug` if curious.
+* Type `nforth --help` for less used options.
 * Call the .NET APIs with these words. (FYI just static methods with strings or numbers for now).
 
 ```factor
@@ -36,12 +41,7 @@ nforth -e 's\" myfile.io" load aword'
 : sqrt   s" System.Math"        s" Sqrt"             .net ;
 ```
 
-* Call from .NET to Forth with the public APIs on the `Vm` class. Look at the `Forth.Net.Program` folder for a simple example. 
-* To include the library, copy the file `Vm.cs` or reference the nuget package `Forth.Net` in your project. It is lightly literate programmed. See [here](Forth.Net)
-* See all the supported words with `words`.
-* Perform a system test with `testsys`. Your results should look like the text at the bottom of this doc.
-* Type `debug` if curious.
-* Type `nforth --help` for less used options.
+## Test output
 
 ```console
 CR CR SOURCE TYPE ( Preliminary test ) CR
