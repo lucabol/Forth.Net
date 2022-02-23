@@ -1,6 +1,30 @@
  ## Abstract
 This is a Forth for the .NET framework in one cs file. It is a token threaded implementation that can save its status to a very concise binary format.
 Feel free to reuse this code as you wish.  
+ ## How to use it
+Simply copy this file or reference the nuget package `Forth.Net` in your project. This is the public interface:
+
+~~~~csharp
+public class Vm {
+    publc Vm( ... sizes of memory areas ...);
+
+    public Func<string>? NextLine;
+    public void Quit();
+
+    public void EvaluateSingleLine   (string forthLine);
+    public void EvaluateMultipleLines(string forthLines);
+
+    public bool Debug;
+    public void Reset();
+
+    public IEnumberalbe<string> Words;
+    public string StackString();
+}
+~~~~
+
+You set `NextLine` to tell Forth where to get the next line of input from. `Quit` starts the interpretation. `EvaluateSingleLine` and `EvaluateMultipleLines` are utility functions.
+You can write them yourself with `NextLine` and `Quit`. The rest should be self explanatory.
+ 
  ## Preliminaries
 The ambition was to write a Forth that can be recompiled for 32 or 64 bits. I just tested the 64 bits part.
 The rest is just standard `using` stuff that I can't move to a `global.cs` file because I want to be able to simply copy
@@ -26,8 +50,6 @@ using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using static Forth.Utils;
-
-using GitVarInt;
 
 [assembly:InternalsVisibleTo("Forth.Net.Tests")]
 
@@ -854,7 +876,7 @@ We will comment on the most interesting cases.
                     EvaluateMultipleLines(PRELIM_TEST);
                     break;
                 case Token.DotS:
-                    Console.WriteLine(DotS());
+                    Console.WriteLine(StackString());
                     break;
                 case Token.Quit:
                     Quit();
@@ -1781,6 +1803,7 @@ static class Utils {
     }
 
     internal static void Write7BitEncodedCell(Code[] codes, Index index, Cell value, out Index howMany) {
+        //howMany = Write(codes, index, value);
         using var stream = new MemoryStream(codes, index, 10);
         howMany = (Index)stream.Position;
         stream.WriteVarInt(value);
@@ -1795,6 +1818,92 @@ static class Utils {
         => b >= (int)Vm.Token.FirstHasVarNumb && b < (int) Vm.Token.FirstStringWord;
     internal static bool HasStringSize(byte b)
         => b >= (int)Vm.Token.FirstStringWord;
+
+    // Rewritten from https://github.com/pvginkel/GitVarInt/blob/master/GitVarInt/VarInt.cs
+    // to remove unsafe code and use new C# feature with the goal of removing any dependencies and be able to copy the file to a project.
+    static int ReadVarInt32(this Stream stream) => ZigZagDecode(stream.ReadVarUInt32());
+
+    static uint ReadVarUInt32(this Stream stream)
+    {
+        byte b = ReadByte(stream);
+        uint value = (uint)(b & 127);
+
+        while ((b & 128) != 0)
+        {
+            value += 1;
+            if (value == 0 || (value & 0xfe000000u) != 0)
+                Throw("Decode overflow");
+            b = ReadByte(stream);
+            value = (value << 7) + (uint)(b & 127);
+        }
+
+        return value;
+    }
+
+    static long ReadVarInt64(this Stream stream) => ZigZagDecode(stream.ReadVarUInt64());
+
+    static ulong ReadVarUInt64(this Stream stream)
+    {
+        byte b = ReadByte(stream);
+        ulong value = (ulong)(b & 127);
+
+        while ((b & 128) != 0)
+        {
+            value += 1;
+            if (value == 0 || (value & 0xfe00000000000000ul) != 0)
+                Throw("Decode overflow");
+            b = ReadByte(stream);
+            value = (value << 7) + (ulong)(b & 127);
+        }
+
+        return value;
+    }
+
+    static void WriteVarInt(this Stream stream, int value) => stream.WriteVarInt(ZigZagEncode(value));
+
+    static void WriteVarInt(this Stream stream, uint value)
+    {
+        Span<byte> buffer = stackalloc byte[5];
+        int offset = 5;
+
+        buffer[--offset] = (byte)(value & 0x7F);
+
+        while ((value >>= 7) != 0)
+            buffer[--offset] = (byte)(0x80 | (--value & 0x7F));
+
+        while (offset < 5)
+            stream.WriteByte(buffer[offset++]);
+    }
+
+    static void WriteVarInt(this Stream stream, long value) => stream.WriteVarInt(ZigZagEncode(value));
+
+    static void WriteVarInt(this Stream stream, ulong value)
+    {
+        Span<byte> buffer = stackalloc byte[10];
+        int offset = 10;
+
+        buffer[--offset] = (byte)(value & 0x7F);
+
+        while ((value >>= 7) != 0)
+            buffer[--offset] = (byte)(0x80 | (--value & 0x7F));
+
+        while (offset < 10)
+            stream.WriteByte(buffer[offset++]);
+    }
+
+    static uint  ZigZagEncode(int value)   => ((uint) value << 1) ^ (uint)-(int)((uint)value >> 31);
+    static ulong ZigZagEncode(long value)  => ((ulong)value << 1) ^ (ulong)-(long)((ulong)value >> 63);
+    static int   ZigZagDecode(uint value)  => (int)  (value >> 1) ^ -((int)value & 0x1);
+    static long  ZigZagDecode(ulong value) => (long) (value >> 1) ^ -((long)value & 0x1);
+
+    private static byte ReadByte(Stream stream)
+    {
+        int b = stream.ReadByte();
+        if (b == -1)
+            Throw("Unexpected end");
+
+        return (byte)b;
+    }
 }
 
 System.Char[]
@@ -1882,7 +1991,7 @@ System.Char[]
         }
     }
     // Code duplication from EvaluateSingleLine on purpose for perf reason. TODO: Refactor EvaluateMultipleLines.
-    void EvaluateMultipleLines(string forthCode)
+    public void EvaluateMultipleLines(string forthCode)
     {
         var oldLine = NextLine;
         try {
@@ -1948,10 +2057,9 @@ System.Char[]
     }
     internal bool IsEmptyWord() => ds[Peek()] == 0;
 
-    public string DotS()
+    public string StackString()
     {
-        StringBuilder sb = new("Stack: ");
-        //sb.Append($"<{sp / CELL_SIZE}> ");
+        StringBuilder sb = new("\\ ");
         for (int i = 0; i < sp; i += CELL_SIZE)
         {
             sb.Append(ReadCell(ps, i)); sb.Append(' ');

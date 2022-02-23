@@ -2,6 +2,30 @@
 This is a Forth for the .NET framework in one cs file. It is a token threaded implementation that can save its status to a very concise binary format.
 Feel free to reuse this code as you wish.  **/
 
+/** ## How to use it
+Simply copy this file or reference the nuget package `Forth.Net` in your project. This is the public interface:
+
+~~~~csharp
+public class Vm {
+    publc Vm( ... sizes of memory areas ...);
+
+    public Func<string>? NextLine;
+    public void Quit();
+
+    public void EvaluateSingleLine   (string forthLine);
+    public void EvaluateMultipleLines(string forthLines);
+
+    public bool Debug;
+    public void Reset();
+
+    public IEnumberalbe<string> Words;
+    public string StackString();
+}
+~~~~
+
+You set `NextLine` to tell Forth where to get the next line of input from. `Quit` starts the interpretation. `EvaluateSingleLine` and `EvaluateMultipleLines` are utility functions.
+You can write them yourself with `NextLine` and `Quit`. The rest should be self explanatory.
+ **/
 /** ## Preliminaries
 The ambition was to write a Forth that can be recompiled for 32 or 64 bits. I just tested the 64 bits part.
 The rest is just standard `using` stuff that I can't move to a `global.cs` file because I want to be able to simply copy
@@ -726,7 +750,7 @@ We will comment on the most interesting cases.
                     EvaluateMultipleLines(PRELIM_TEST);
                     break;
                 case Token.DotS:
-                    Console.WriteLine(DotS());
+                    Console.WriteLine(StackString());
                     break;
                 case Token.Quit:
                     Quit();
@@ -1338,10 +1362,9 @@ false invert constant true
     }
     internal bool IsEmptyWord() => ds[Peek()] == 0;
 
-    public string DotS()
+    public string StackString()
     {
-        StringBuilder sb = new("Stack: ");
-        //sb.Append($"<{sp / CELL_SIZE}> ");
+        StringBuilder sb = new("\\ ");
         for (int i = 0; i < sp; i += CELL_SIZE)
         {
             sb.Append(ReadCell(ps, i)); sb.Append(' ');
@@ -1857,6 +1880,8 @@ static class Utils {
     internal static bool HasStringSize(byte b)
         => b >= (int)Vm.Token.FirstStringWord;
 
+    // Rewritten from https://github.com/pvginkel/GitVarInt/blob/master/GitVarInt/VarInt.cs
+    // to remove unsafe code and use new C# feature with the goal of removing any dependencies and be able to copy the file to a project.
     static int ReadVarInt32(this Stream stream) => ZigZagDecode(stream.ReadVarUInt32());
 
     static uint ReadVarUInt32(this Stream stream)
@@ -1927,10 +1952,10 @@ static class Utils {
             stream.WriteByte(buffer[offset++]);
     }
 
-    static uint ZigZagEncode(int value)   => ((uint)value << 1) ^ (uint)-(int)((uint)value >> 31);
-    static ulong ZigZagEncode(long value) => ((ulong)value << 1) ^ (ulong)-(long)((ulong)value >> 63);
-    static int ZigZagDecode(uint value)   => (int)(value >> 1) ^ -((int)value & 0x1);
-    static long ZigZagDecode(ulong value) => (long)(value >> 1) ^ -((long)value & 0x1);
+    static uint  ZigZagEncode(int value)   => ((uint) value << 1) ^ (uint)-(int)((uint)value >> 31);
+    static ulong ZigZagEncode(long value)  => ((ulong)value << 1) ^ (ulong)-(long)((ulong)value >> 63);
+    static int   ZigZagDecode(uint value)  => (int)  (value >> 1) ^ -((int)value & 0x1);
+    static long  ZigZagDecode(ulong value) => (long) (value >> 1) ^ -((long)value & 0x1);
 
     private static byte ReadByte(Stream stream)
     {

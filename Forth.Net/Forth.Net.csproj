@@ -5,6 +5,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AnalysisMode>Default</AnalysisMode>
+    <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+    <Authors>lucabol</Authors>
+    <Description>Lets you execute Forth code from a C# program.</Description>
+    <PackageReadmeFile>Readme.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/lucabol/Forth.Net</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/lucabol/Forth.Net</PackageProjectUrl>
+    <PackageTags>forth;c#;cli</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="Readme.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
 </Project>
